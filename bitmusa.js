@@ -647,15 +647,15 @@ class Bitmusa {
 
         try {
             const response = await this.requestAPI(`/future-order/cancel/${order_id}`, 'put', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            if (response.status === 200) {
+                const json = response.data;
+
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
             }
-            
-            return json;
         } catch (error) {
             throw new Error(`${error.message}`);
         }
@@ -681,15 +681,15 @@ class Bitmusa {
 
         try {
             const response = await this.requestAPI('/future-order/cancel_all', 'put', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            }
+            if (response.status === 200) {
+                const json = response.data;
 
-            return json;
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
