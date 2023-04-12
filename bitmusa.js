@@ -498,6 +498,7 @@ class Bitmusa {
         const funcName = '[getRecentTrades]:';
 
         if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
+        if (pageSize == 0) throw new Error(`${funcName} pageSize is 0`);
         targetSymbol = targetSymbol.toUpperCase();
         baseSymbol = baseSymbol.toUpperCase();
         const pair = `${targetSymbol}${baseSymbol}`;
@@ -508,16 +509,16 @@ class Bitmusa {
         }
 
         try {
-            const response = await this.requestAPI('/future-market-trade/', 'get', parameters);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
-
-            return json;
+            const response = await this.requestFutureAPI('/future-market-trade/', 'get', parameters);
+            if (response.status === 200) {
+                const json = response.data;
+                
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
