@@ -73,6 +73,28 @@ class Bitmusa {
 
     }
 
+    async requestFutureAPI(path, method, parameters = null) {
+        method = method.toUpperCase();
+        var options = {
+            method: method,
+            url: `${this.options.baseURL}${path}`,
+            headers: {
+                'x-auth-token': this.options.authKey,
+                'Content-Type': 'application/json'
+            },
+            data: parameters,
+            responseType: 'json',
+            timeout: this.options.timeout
+        };
+        if (method === 'GET') options = Object.assign(options, { params: parameters });
+        try {
+            const response = await axios.request(options);
+            return response;
+        } catch (error) {
+            return error.response;
+        }
+        
+    }
 
     async signIn(email, password) {
         const funcName = '[signIn]:';
