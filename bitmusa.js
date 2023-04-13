@@ -110,7 +110,7 @@ class Bitmusa {
             const response = await this.requestAPI('/users/v1/signin', 'post', parameters);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if (json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
             }
@@ -143,12 +143,12 @@ class Bitmusa {
         } else {
             parameters = Object.assign(parameters, { type: 'MARKET_PRICE', price: "0" });
         }
-        //console.log(parameters);
+
         try {
             const response = await this.requestAPI('/exchange/order/add', 'get', parameters);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if (json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
             }
@@ -169,7 +169,7 @@ class Bitmusa {
             const response = await this.requestAPI(`/exchange/order/cancel/${orderId}`, 'post');
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if (json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
             }
@@ -214,13 +214,11 @@ class Bitmusa {
             }
         } 
 
-        console.log(options);
-
         try {
             const response = await this.requestAPI(`/exchange/order/cancelall`, 'post', options);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            console.log(json);
+
             if (json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
             }
@@ -245,7 +243,7 @@ class Bitmusa {
             const response = await this.requestAPI('/exchange/order/personal/current', 'get', parameters);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if ((json.code) && (json.code !== 0))
             {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -275,7 +273,7 @@ class Bitmusa {
             const response = await this.requestAPI('/exchange/order/personal/history', 'get', parameters);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if ((json.code) && (json.code !== 0))
             {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -305,7 +303,7 @@ class Bitmusa {
             const response = await this.requestAPI('/exchange/trade/personal/history', 'get', parameters);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if ((json.code) && (json.code !== 0))
             {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -334,7 +332,7 @@ class Bitmusa {
             const response = await this.requestAPI('/market/latest-trade', 'get', parameters);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if ((json.code) && (json.code !== 0))
             {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -354,7 +352,7 @@ class Bitmusa {
             const response = await this.requestAPI('/market/symbol-thumb', 'get');
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if ((json.code) && (json.code !== 0))
             {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -376,7 +374,7 @@ class Bitmusa {
             const response = await this.requestAPI('/market/symbol-thumb', 'get');
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if ((json.code) && (json.code !== 0))
             {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -401,7 +399,7 @@ class Bitmusa {
             const response = await this.requestAPI('/market/symbol-thumb', 'get');
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if ((json.code) && (json.code !== 0))
             {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -426,7 +424,7 @@ class Bitmusa {
             const response = await this.requestAPI('/users/asset/wallet', 'get');
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if ((json.code) && (json.code !== 0))
             {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -448,7 +446,7 @@ class Bitmusa {
             const response = await this.requestAPI('/users/asset/wallet', 'get');
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json.data);
+
             if ((json.code) && (json.code !== 0))
             {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -479,7 +477,7 @@ class Bitmusa {
             const response = await this.requestAPI('/market/exchange-plate-mini', 'get', parameters);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
-            //console.log(json);
+
             if ((json.code) && (json.code !== 0))
             {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
