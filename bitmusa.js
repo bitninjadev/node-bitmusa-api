@@ -436,6 +436,8 @@ class Bitmusa {
         }
     }
 
+
+    
     async getBalance(symbol = null) {
         const funcName = '[getBalance]:';
 
@@ -486,6 +488,47 @@ class Bitmusa {
 
             return json;
         } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+
+
+    async fetchKline(targetSymbol = null, baseSymbol = "USDT", interval = "1m", startTime = null, endTime = null) {
+        const funcName = '[getKline]:';
+
+        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
+        targetSymbol = targetSymbol.toUpperCase();
+        baseSymbol = baseSymbol.toUpperCase();
+        const pair = `${targetSymbol}/${baseSymbol}`;
+
+        // only supports 1m, 5m, 15m, 30m, 1d, 1w, 1M
+        const supportedIntervals = ['1m', '5m', '15m', '30m', '1h', '1d', '1w', '1M'];
+        if(!supportedIntervals.includes(interval)) throw new Error(`${funcName} interval is not supported: ${interval}, it must be one of [${supportedIntervals}]`);
+
+        if(interval === '1m') interval = '1';        
+        else if(interval === '30m') interval = '30';
+        else if(interval === '60m' || interval === '1h') interval = '60';
+
+        var options = {
+            symbol: `${pair}`,
+            from : startTime,
+            to : endTime,
+            resolution : interval
+        };
+
+        try {
+            const response = await this.requestAPI('/market/history', 'get', options);
+            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
+            const json = response.data;
+            //console.log(json);
+            if ((json.code) && (json.code !== 0))
+            {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+
+            return json;
+        }catch (error) {
             throw new Error(`${error.message}`);
         }
     }
@@ -992,7 +1035,7 @@ class Bitmusa {
         }
     }
 
-
+    
 
 
 
