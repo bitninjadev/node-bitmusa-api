@@ -347,7 +347,6 @@ class Bitmusa {
     }
 
     
-
     async fetchTickers() {
         const funcName = '[fetchTitkcers]:';
 
@@ -512,7 +511,7 @@ class Bitmusa {
             const response = await this.requestFutureAPI('/future-market-trade/', 'get', parameters);
             if (response.status === 200) {
                 const json = response.data;
-                
+
                 return json;
             } else if (response.status === 400) {
                 throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
@@ -538,7 +537,7 @@ class Bitmusa {
         }
 
         try {
-            const response = await this.requestAPI('/future-orderbook/', 'get', parameters);
+            const response = await this.requestFutureAPI('/future-orderbook/', 'get', parameters);
             if (response.status === 200) {
                 const json = response.data;
 
@@ -578,7 +577,7 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestAPI('/future-order/', 'post', options);
+            const response = await this.requestFutureAPI('/future-order/', 'post', options);
             if (response.status === 200) {
                 const json = response.data;
 
@@ -620,7 +619,7 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestAPI('/future-order/', 'post', options);
+            const response = await this.requestFutureAPI('/future-order/', 'post', options);
             if (response.status === 200) {
                 const json = response.data;
 
@@ -646,7 +645,7 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestAPI(`/future-order/cancel/${order_id}`, 'put', options);
+            const response = await this.requestFutureAPI(`/future-order/cancel/${order_id}`, 'put', options);
             if (response.status === 200) {
                 const json = response.data;
 
@@ -680,7 +679,7 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestAPI('/future-order/cancel_all', 'put', options);
+            const response = await this.requestFutureAPI('/future-order/cancel_all', 'put', options);
             if (response.status === 200) {
                 const json = response.data;
 
@@ -708,16 +707,16 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestAPI('/future-position/close_all', 'put', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            }
+            const response = await this.requestFutureAPI('/future-position/close_all', 'put', options);
+            if (response.status === 200) {
+                const json = response.data;
 
-            return json;
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
@@ -743,16 +742,16 @@ class Bitmusa {
         if (start_time) options = { ...options, start_time: start_time };
 
         try {
-            const response = await this.requestAPI('/future-order/', 'get', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            }
+            const response = await this.requestFutureAPI('/future-order/', 'get', options);
+            if (response.status === 200) {
+                const json = response.data;
 
-            return json;
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
@@ -782,16 +781,16 @@ class Bitmusa {
 
 
         try {
-            const response = await this.requestAPI('/future-order/history', 'get', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            }
+            const response = await this.requestFutureAPI('/future-order/history', 'get', options);
+            if (response.status === 200) {
+                const json = response.data;
 
-            return json;
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
@@ -818,16 +817,16 @@ class Bitmusa {
         if (end_time!==null) options = { ...options, end_time: end_time };
 
         try {
-            const response = await this.requestAPI('/future-trade/history', 'get', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            }
+            const response = await this.requestFutureAPI('/future-trade/history', 'get', options);
+            if (response.status === 200) {
+                const json = response.data;
 
-            return json;
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
@@ -853,16 +852,16 @@ class Bitmusa {
         
 
         try {
-            const response = await this.requestAPI('/future-position/', 'get', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            }
+            const response = await this.requestFutureAPI('/future-position/', 'get', options);
+            if (response.status === 200) {
+                const json = response.data;
 
-            return json;
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
@@ -872,16 +871,16 @@ class Bitmusa {
         const funcName = '[fetchFutureBalance]:';
 
         try {
-            const response = await this.requestAPI('/future-wallet/', 'get', {});
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            }
+            const response = await this.requestFutureAPI('/future-wallet/', 'get', {});
+            if (response.status === 200) {
+                const json = response.data;
 
-            return json;
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
@@ -894,18 +893,17 @@ class Bitmusa {
         symbol = symbol.toUpperCase();
 
         try {
-            const response = await this.requestAPI('/future-wallet/', 'get', {});
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            const response = await this.requestFutureAPI('/future-wallet/', 'get', {});
+            if (response.status === 200) {
+                const json = response.data;
+                const balance = json.find((item) => item.symbol === symbol);
+
+                return balance;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
             }
-
-            const balance = json.find((item) => item.symbol === symbol);
-
-            return balance;
         } catch (error) {
             throw new Error(`${error.message}`);
         }
@@ -920,16 +918,16 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestAPI('/future-board/', 'get', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            }
+            const response = await this.requestFutureAPI('/future-board/', 'get', options);
+            if (response.status === 200) {
+                const json = response.data;
 
-            return json;
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
@@ -948,16 +946,16 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestAPI('/future-board/', 'get', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            }
+            const response = await this.requestFutureAPI('/future-board/', 'get', options);
+            if (response.status === 200) {
+                const json = response.data;
 
-            return json;
+                return json;
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
@@ -965,32 +963,32 @@ class Bitmusa {
 
     async getFuturePrice(targetSymbol = null, baseSymbol = "TUSDT") {
         const funcName = '[getFuturePrice]:';
-
+    
         if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
         targetSymbol = targetSymbol.toUpperCase();
         baseSymbol = baseSymbol.toUpperCase();
         const pair = `${targetSymbol}${baseSymbol}`;
-
+    
         var options = {
             ticker: `${pair}`
         };
-
+    
         try {
-            const response = await this.requestAPI('/future-board/', 'get', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            const response = await this.requestFutureAPI('/future-board/', 'get', options);
+            
+            if (response.status === 200) {
+                const json = response.data;
+                
+                if (json.ticker === pair) {
+                    return json.last_price;
+                }
+                
+                throw new Error(`${funcName} ${pair} is not found`);
+            } else if (response.status === 400) {
+                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            } else {
+                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
             }
-
-            if (json.ticker===pair)
-            {
-                return json.last_price;
-            }
-
-            throw new Error(`${funcName} ${pair} is not found`);
         } catch (error) {
             throw new Error(`${error.message}`);
         }
