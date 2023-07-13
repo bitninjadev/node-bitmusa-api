@@ -1,29 +1,33 @@
-const axios = require('axios');
-const request = require('request');
-const querystring = require('querystring');
+const axios = require("axios");
+const request = require("request");
+const querystring = require("querystring");
 
 class Bitmusa {
     constructor(options = {}) {
-        if (typeof options === 'string') {
-            this.options = {
-                ...this.getDefaultOptions(),
-                ...{ authKey: options }
-            };
-        } else if (typeof options == 'object') {
-            this.options = {
-                ...this.getDefaultOptions(),
-                ...options
-            };
-        } else {
-            this.options = this.getDefaultOptions();;
+        this.options = this.getDefaultOptions();
+
+        if (typeof options === "string") {
+            throw new Error("options must be an object");
+        } else if (typeof options === "object") {
+            if (!options.xApiKey || !options.authKey) throw new Error("xApiKey or authKey is blank");
+
+            this.setApiKey(options.xApiKey);
+            this.setAuthKey(options.authKey);
+
+            if (options.baseURL) {
+                this.setBaseURL(options.baseURL);
+            }
+            if (options.timeout) {
+                this.setTimeout(options.timeout);
+            }
         }
     }
 
     getDefaultOptions() {
         return {
-            baseURL: 'https://www.bitmusa.com/api',
-            timeout: 1000
-        }
+            baseURL: "https://openapi.bitmusa.com",
+            timeout: 1000,
+        };
     }
 
     setBaseURL(baseURL) {
@@ -42,6 +46,14 @@ class Bitmusa {
         return this.options.authKey;
     }
 
+    setApiKey(xApiKey) {
+        this.options.xApiKey = xApiKey;
+    }
+
+    getApiKey() {
+        return this.options.xApiKey;
+    }
+
     setTimeout(timeout) {
         this.options.timeout = timeout;
     }
@@ -52,100 +64,98 @@ class Bitmusa {
 
     async requestAPI(path, method, parameters = null) {
         method = method.toUpperCase();
-        var options = {
-            method: method,
-            url: `${this.options.baseURL}${path}`,
-            headers: {
-                'x-auth-token': this.options.authKey,
-                'Content-Type': 'application/json'
-            },
-            data: parameters,
-            responseType: 'json',
-            timeout: this.options.timeout
+        const headers = {
+            Authorization: `Bearer ${this.options.authKey}`,
+            "x-api-key": this.options.xApiKey,
+            "Content-Type": "application/json",
         };
-        if (method === 'GET') options = Object.assign(options, { params: parameters });
+        const url = `${this.options.baseURL}${path}`;
+        const requestOptions = {
+            method: method,
+            url: url,
+            headers: headers,
+            data: parameters,
+            responseType: "json",
+            timeout: this.options.timeout,
+        };
+        if (method === "GET") {
+            requestOptions.params = parameters;
+        }
         try {
-            const response = await axios.request(options);
+            const response = await axios.request(requestOptions);
             return response;
         } catch (error) {
             throw new Error(`Failed to requestAPI(${path}): ${error.message}`);
         }
-
     }
 
-    async requestFutureAPI(path, method, parameters = null) {
+    async requestFuturesAPI(path, method, parameters = null) {
         method = method.toUpperCase();
-        var options = {
-            method: method,
-            url: `${this.options.baseURL}${path}`,
-            headers: {
-                'x-auth-token': this.options.authKey,
-                'Content-Type': 'application/json'
-            },
-            data: parameters,
-            responseType: 'json',
-            timeout: this.options.timeout
+        const headers = {
+            Authorization: `Bearer ${this.options.authKey}`,
+            "x-api-key": this.options.xApiKey,
+            "Content-Type": "application/json",
         };
-        if (method === 'GET') options = Object.assign(options, { params: parameters });
+        const url = `${this.options.baseURL}${path}`;
+        const requestOptions = {
+            method: method,
+            url: url,
+            headers: headers,
+            data: parameters,
+            responseType: "json",
+            timeout: this.options.timeout,
+        };
+        if (method === "GET") {
+            requestOptions.params = parameters;
+        }
+
         try {
-            const response = await axios.request(options);
+            const response = await axios.request(requestOptions);
             return response;
         } catch (error) {
             return error.response;
         }
-        
     }
 
-    async signIn(email, password) {
-        const funcName = '[signIn]:';
+    async order(symbol = null, direction = null, quantity = null, price = null, params = {}) {
+        const funcName = "[order]:";
 
-        if (!email) throw new Error(`${funcName} email is blank`);
-        if (!password) throw new Error(`${funcName} password is blank`);
-
-        try {
-            const parameters = {
-                email: email,
-                password: password
-            }
-            const response = await this.requestAPI('/users/v1/signin', 'post', parameters);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-
-            if (json.code !== 0) {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            }
-
-            return json;
-        } catch (error) {            
-            throw new Error(`${error.message}`);
-        }
-    }
-
-    async createOrder(direction, targetSymbol, baseSymbol = 'USDT', amount, type = "MARKET", price = null) {
-        const funcName = '[createOrder]:';
-
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
         if (!direction) throw new Error(`${funcName} direction is blank`);
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        if (!amount) throw new Error(`${funcName} amount is blank`);
+        if (!quantity) throw new Error(`${funcName} quantity is blank`);
 
         direction = direction.toUpperCase();
-        const pair = `${targetSymbol}/${baseSymbol}`;
+        symbol = symbol.toUpperCase();
 
-        var parameters = {
-            symbol: pair,
-            amount: `${amount}`,
-            direction: direction,
-            type: type,
-            price: `${price}`,
-        };
-        if (type.toUpperCase().indexOf('LIMIT') >= 0) {
-            parameters = Object.assign(parameters, { type: 'LIMIT_PRICE'});
+        if (direction !== "BUY" && direction !== "SELL") throw new Error(`${funcName} direction must be BUY or SELL`);
+
+        if (price) {
+            if (typeof params.type === "undefined") params.type = "LIMIT_PRICE";
         } else {
-            parameters = Object.assign(parameters, { type: 'MARKET_PRICE', price: "0" });
+            price = 0;
+            if (typeof params.type === "undefined") params.type = "MARKET_PRICE";
         }
 
+        var type = params.type.toUpperCase();
+
+        if (type === "MARKET" || type === "MARKET_PRICE") {
+            type = "MARKET_PRICE";
+        }
+
+        if (type === "LIMIT" || type === "LIMIT_PRICE") {
+            type = "LIMIT_PRICE";
+        }
+
+        var options = {
+            symbol: symbol,
+            price: `${price}`,
+            amount: `${quantity}`,
+            direction: direction,
+            type: type,
+        };
+
         try {
-            const response = await this.requestAPI('/exchange/order/add', 'get', parameters);
+            const response = await this.requestAPI("/api/v1/spot/order", "post", options);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
 
@@ -159,14 +169,79 @@ class Bitmusa {
         }
     }
 
+    async limitBuy(symbol, quantity = null, price = null, params = { type: "LIMIT_PRICE" }) {
+        const funcName = "[limitBuy]:";
+
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!quantity) throw new Error(`${funcName} quantity is blank`);
+        if (!price) throw new Error(`${funcName} price is blank`);
+
+        symbol = symbol.toUpperCase();
+
+        try {
+            const response = await this.order(symbol, "BUY", quantity, price, params);
+            return response;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async limitSell(symbol, quantity = null, price = null, params = { type: "LIMIT_PRICE" }) {
+        const funcName = "[limitSell]:";
+
+        if (!symbol) throw new Error(`${funcName} quantity is blank`);
+        if (!quantity) throw new Error(`${funcName} quantity is blank`);
+        if (!price) throw new Error(`${funcName} price is blank`);
+
+        symbol = symbol.toUpperCase();
+
+        try {
+            const response = await this.order(symbol, "SELL", quantity, price, params);
+            return response;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async marketBuy(symbol, quantity = null, params = { type: "MARKET_PRICE" }) {
+        const funcName = "[marketBuy]:";
+
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!quantity) throw new Error(`${funcName} quantity is blank`);
+
+        symbol = symbol.toUpperCase();
+
+        try {
+            const response = await this.order(symbol, "BUY", quantity, 0, params);
+            return response;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async marketSell(symbol, quantity = null, params = { type: "MARKET_PRICE" }) {
+        const funcName = "[marketSell]:";
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!quantity) throw new Error(`${funcName} quantity is blank`);
+
+        symbol = symbol.toUpperCase();
+
+        try {
+            const response = await this.order(symbol, "SELL", quantity, 0, params);
+            return response;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
 
     async cancelOrder(orderId) {
-        const funcName = '[cancelOrder]:';
+        const funcName = "[cancelOrder]:";
 
         if (!orderId) throw new Error(`${funcName} orderId is blank`);
 
         try {
-            const response = await this.requestAPI(`/exchange/order/cancel/${orderId}`, 'post');
+            const response = await this.requestAPI(`/api/v1/spot/order/cancel/${orderId}`, "post");
+
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
 
@@ -180,42 +255,19 @@ class Bitmusa {
         }
     }
 
-    async cancelAllOrders(targetSymbol = null, baseSymbol = 'USDT', direction = null) {
-        const funcName = '[cancelAllOrders]:';
-        // direction is not working from API server
-        // targetSymbol is not working from API server
-        // baseSymbol is not working from API server
-        // only cancel all orders
-        
+    async cancelAllOrders(symbol = null) {
+        const funcName = "[cancelAllOrders]:";
+
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+
+        symbol = symbol.toUpperCase();
+
         var options = {
+            symbol: symbol,
         };
 
-        var pair = "";
-
-        if (targetSymbol)
-        {
-            targetSymbol = targetSymbol.toUpperCase();
-            baseSymbol = baseSymbol.toUpperCase();
-            pair = `${targetSymbol}/${baseSymbol}`;
-            options = Object.assign(options, { symbol: pair });
-        }
-
-        if (direction==null)
-        {
-            // cancel all direction
-        } else {
-            direction = direction.toUpperCase();
-            if (direction !== 'BUY' && direction !== 'SELL') {
-                throw new Error('[cancelAll] direction is not BUY or SELL or null');
-            } else {
-                if (direction=="BUY") direction = 0;
-                if (direction=="SELL") direction = 1;
-                options = Object.assign(options, { direction: direction });
-            }
-        } 
-
         try {
-            const response = await this.requestAPI(`/exchange/order/cancelall`, 'post', options);
+            const response = await this.requestAPI(`/api/v1/spot/order/cancel/all`, "post", options);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
 
@@ -229,55 +281,55 @@ class Bitmusa {
         }
     }
 
-    async fetchOpenOrders(pageNo = 1, pageSize = 10) {
-        const funcName = '[fetchOpenOrders]:';
+    async openOrders(symbol = null, pageNo = 1, pageSize = 10) {
+        const funcName = "[openOrders]:";
+
         if (pageNo < 1) throw new Error(`${funcName} pageNo start from 1`);
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+
+        symbol = symbol.toUpperCase();
 
         var parameters = {
-            pageNo : pageNo, // 1 is start, not 0
-            pageSize : pageSize,
-            //symbol : "BTC/USDT" // not supported
+            pageNo: pageNo,
+            pageSize: pageSize,
+            symbol: symbol,
+        };
 
-        }
         try {
-            const response = await this.requestAPI('/exchange/order/personal/current', 'get', parameters);
+            const response = await this.requestAPI("/api/v1/spot/order", "get", parameters);
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
 
-            if ((json.code) && (json.code !== 0))
-            {
+            if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
+            }
 
-            return json;
+            return json.data.content;
         } catch (error) {
             throw new Error(`${error.message}`);
         }
     }
 
-    async fetchOrders(pageNo = 1, pageSize = 10, targetSymbol = null, baseSymbol = "USDT") {
-        const funcName = '[fetchOrders]:';
-        if (pageNo < 1) throw new Error(`${funcName} pageNo start from 1`);
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const symbol = `${targetSymbol}/${baseSymbol}`;
+    async recentTrades(symbol = null, size = 20) {
+        const funcName = "[recentTrades]:";
 
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+
+        symbol = symbol.toUpperCase();
 
         var parameters = {
-            pageNo : pageNo, // 1 is start, not 0
-            pageSize : pageSize,
-        }
-        if (symbol) parameters = Object.assign(parameters, { symbol: symbol });
-        try {
-            const response = await this.requestAPI('/exchange/order/personal/history', 'get', parameters);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
+            symbol: symbol,
+            size: size,
+        };
 
-            if ((json.code) && (json.code !== 0))
-            {
+        try {
+            const response = await this.requestAPI("/api/v1/spot/market/trade", "get", parameters);
+            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
+            const json = response.data.data;
+
+            if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
+            }
 
             return json;
         } catch (error) {
@@ -285,150 +337,85 @@ class Bitmusa {
         }
     }
 
+    async tickers(symbol = null) {
+        const funcName = "[tickers]:";
 
-    async fetchTrades(pageNo = 1, pageSize = 10, targetSymbol = null, baseSymbol = "USDT") {
-        const funcName = '[fetchOrders]:';
-        if (pageNo < 1) throw new Error(`${funcName} pageNo start from 1`);
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const symbol = `${targetSymbol}/${baseSymbol}`;
+        symbol = symbol.toUpperCase();
 
-        var parameters = {
-            pageNo : pageNo, // 1 is start, not 0
-            pageSize : pageSize,
-        }
-        if (symbol) parameters = Object.assign(parameters, { symbol: symbol });
         try {
-            const response = await this.requestAPI('/exchange/trade/personal/history', 'get', parameters);
+            const response = await this.requestAPI("/api/v1/spot/market", "get");
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
+            const json = response.data.data;
 
-            if ((json.code) && (json.code !== 0))
-            {
+            if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
+            }
 
-            return json;
+            if (!symbol) {
+                return json;
+            } else {
+                const ticker = json.find((item) => item.symbol == symbol);
+
+                if (!ticker) throw new Error(`${funcName} symbol not found`);
+                return ticker;
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
     }
 
-    async fetchRecentTrades(targetSymbol = null, baseSymbol = "USDT", pageSize = 20) {
-        const funcName = '[getRecentTrades]:';
-
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const pair = `${targetSymbol}/${baseSymbol}`;
-
-        var parameters = {
-            symbol : pair,
-            size : pageSize
-        }
+    async prices(symbol = null) {
+        const funcName = "[prices]:";
 
         try {
-            const response = await this.requestAPI('/market/latest-trade', 'get', parameters);
+            const response = await this.requestAPI("/api/v1/spot/market", "get");
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
+            const json = response.data.data;
 
-            if ((json.code) && (json.code !== 0))
-            {
+            if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
+            }
 
-            return json;
+            if (symbol) {
+                symbol = symbol.toUpperCase();
+
+                const ticker = json.find((item) => item.symbol == symbol);
+                if (!ticker) throw new Error(`${funcName} ${symbol} is not found`);
+                if (!ticker.close) throw new Error(`${funcName} ${symbol} close price is not found`);
+                return ticker.close;
+            } else {
+                const prices = json.map((item) => {
+                    return { symbol: item.symbol, close: item.close };
+                });
+
+                return prices;
+            }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
     }
 
-    
-    async fetchTickers() {
-        const funcName = '[fetchTitkcers]:';
+    async balance(symbol = null) {
+        const funcName = "[balance]:";
 
         try {
-            const response = await this.requestAPI('/market/symbol-thumb', 'get');
+            const response = await this.requestFuturesAPI("/api/v1/spot/wallet", "get");
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
+            const json = response.data.data;
 
-            if ((json.code) && (json.code !== 0))
-            {
+            if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
+            }
 
-            return json;
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
+            if (symbol) {
+                symbol = symbol.toUpperCase();
+                if (symbol.split("/").length == 2) throw new Error(`${funcName} symbol must be like BTC`);
 
-    async getTicker(targetSymbol = null, baseSymbol = "USDT") {
-        const funcName = '[getTicker]:';
+                const balance = json.find((item) => item.coin.unit == symbol);
+                if (!balance) throw new Error(`${funcName} ${symbol} is not found`);
 
-        if (targetSymbol === null) throw new Error(`${funcName} targetSymbol is blank`);
-        const pair = targetSymbol + "/" + baseSymbol;
-
-        try {
-            const response = await this.requestAPI('/market/symbol-thumb', 'get');
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
-
-            const ticker = json.find((item) => item.symbol == pair);
-            if (!ticker) throw new Error(`${funcName} ${pair} is not found`);
-
-            return ticker;
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
-
-    async getPrice(targetSymbol = null, baseSymbol = "USDT") {
-        const funcName = '[getPrice]:';
-
-        if (targetSymbol === null) throw new Error(`${funcName} targetSymbol is blank`);
-        const pair = targetSymbol + "/" + baseSymbol;
-
-        try {
-            const response = await this.requestAPI('/market/symbol-thumb', 'get');
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
-
-            const ticker = json.find((item) => item.symbol == pair);
-            if (!ticker) throw new Error(`${funcName} ${pair} is not found`);
-            if (!ticker.close) throw new Error(`${funcName} ${pair} close price is not found`);
-            return ticker.close;
-
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
-    
-
-
-    async fetchBalance() {
-        const funcName = '[fetchBalance]:';
-
-        try {
-            const response = await this.requestAPI('/users/asset/wallet', 'get');
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
+                return balance;
+            }
 
             return json;
         } catch (error) {
@@ -436,55 +423,206 @@ class Bitmusa {
         }
     }
 
+    async orderBook(symbol = null) {
+        const funcName = "[orderBook]:";
 
-    
-    async getBalance(symbol = null) {
-        const funcName = '[getBalance]:';
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+
+        symbol = symbol.toUpperCase();
+
+        var parameters = {
+            symbol: symbol,
+        };
+
+        try {
+            const response = await this.requestAPI("/api/v1/spot/market/orderbook", "get", parameters);
+            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
+            const json = response.data.data;
+
+            if (json.code && json.code !== 0) {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+            if (json == "") throw new Error(`${funcName} ${symbol} is not found`);
+
+            return json;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async futuresOrder(symbol = null, side = null, quantity = null, price = null, params = { marginMode: "ISOLATED", closePosition: false }) {
+        const funcName = "[futuresOrder]:";
+
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!side) throw new Error(`${funcName} side is blank`);
+        if (!quantity) throw new Error(`${funcName} quantity is blank`);
+
+        symbol = symbol.toUpperCase();
+        side = side.toUpperCase();
+
+        var marginMode = 0; //Default margin mode is ISOLATED
+
+        if (params.marginMode) {
+            if (params.marginMode.toUpperCase() !== "ISOLATED" && params.marginMode.toUpperCase() !== "CROSSED") {
+                throw new Error("Margin mode must be either ISOLATED or CROSSED");
+            }
+
+            if (params.marginMode.toUpperCase() === "CROSSED") {
+                marginMode = 1;
+            }
+        }
+
+        if (price) {
+            if (typeof params.type === "undefined") params.type = "LIMIT_PRICE";
+        } else {
+            price = 0;
+            if (typeof params.type === "undefined") params.type = "MARKET_PRICE";
+        }
+
+        var type = params.type.toUpperCase();
+
+        if (type === "MARKET" || type === "MARKET_PRICE") {
+            type = 0;
+        }
+
+        if (type === "LIMIT" || type === "LIMIT_PRICE") {
+            type = 1;
+        }
+
+        var direction = params.closePosition ? 1 : 0;
+
+        if (side !== "BUY" && side !== "SELL") throw new Error(`${funcName} side must be BUY or SELL`);
+        if (side === "BUY") side = 0;
+        if (side === "SELL") side = 1;
+
+        var options = {
+            direction: direction, // 0: Open, 1: Close
+            ticker: `${symbol}`,
+            margin_mode: marginMode,
+            position: side,
+            order_type: type,
+            order_price: price,
+            order_qty: quantity,
+        };
+
+        try {
+            const response = await this.requestFuturesAPI("/api/v1/future/order", "post", options);
+            const json = response.data;
+
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
+            }
+
+            return json;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async futuresLimitBuy(symbol = null, quantity = null, price = null, params = {}) {
+        const funcName = "[futuresLimitBuy]:";
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!quantity) throw new Error(`${funcName} amount is blank`);
+        if (!price) throw new Error(`${funcName} price is blank`);
+
+        symbol = symbol.toUpperCase();
+
+        Object.assign(params, { type: "LIMIT_PRICE" });
+
+        try {
+            const response = await this.futuresOrder(symbol, "BUY", quantity, price, params);
+            return response;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async futuresLimitSell(symbol, quantity = null, price = null, params = {}) {
+        const funcName = "[futuresLimitSell]:";
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!quantity) throw new Error(`${funcName} quantity is blank`);
+        if (!price) throw new Error(`${funcName} price is blank`);
+
+        symbol = symbol.toUpperCase();
+
+        Object.assign(params, { type: "LIMIT_PRICE" });
+
+        try {
+            const response = await this.futuresOrder(symbol, "SELL", quantity, price, params);
+            return response;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async futuresMarketBuy(symbol, quantity = null, params = {}) {
+        const funcName = "[futuresMarketBuy]:";
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!quantity) throw new Error(`${funcName} quantity is blank`);
+
+        symbol = symbol.toUpperCase();
+
+        Object.assign(params, { type: "MARKET_PRICE" });
+
+        try {
+            const response = await this.futuresOrder(symbol, "BUY", quantity, 0, params);
+            return response;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async futuresMarketSell(symbol, quantity, params = {}) {
+        const funcName = "[futuresMarketSell]:";
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!quantity) throw new Error(`${funcName} quantity is blank`);
+
+        symbol = symbol.toUpperCase();
+
+        Object.assign(params, { type: "MARKET_PRICE" });
+
+        try {
+            const response = await this.futuresOrder(symbol, "SELL", quantity, 0, params);
+            return response;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async cancelFuturesOrder(order_id) {
+        const funcName = "[cancelFuturesOrder]:";
+        if (!order_id) throw new Error(`${funcName} order_id is blank`);
+
+        try {
+            const response = await this.requestFuturesAPI(`/api/v1/future/order/cancel/${order_id}`, "post");
+            const json = response.data;
+
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
+            }
+
+            return json;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async cancelAllFuturesOrders(symbol = null) {
+        const funcName = "[cancelAllFuturesOrders]:";
 
         if (!symbol) throw new Error(`${funcName} symbol is blank`);
         symbol = symbol.toUpperCase();
 
         try {
-            const response = await this.requestAPI('/users/asset/wallet', 'get');
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
+            const response = await this.requestFuturesAPI(`/api/v1/future/order/cancel/all?ticker=${symbol}`, "post");
             const json = response.data;
 
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
-            if (!json.data) throw new Error(`${funcName} data node is not found`);
-            const balance = json.data.find((item) => item.coin.unit == symbol);
-            if (!balance) throw new Error(`${funcName} ${symbol} is not found`);
-
-            return balance;
-        } catch (error) {
-            throw new Error(`Failed to balance: ${error.message}`);
-        }
-    }
-
-
-
-    async fetchOrderBook(targetSymbol = null, baseSymbol = "USDT") {
-        const funcName = '[fetchOrderBook]:';
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-
-        const pair = targetSymbol + "/" + baseSymbol;
-
-        var parameters = {
-            symbol : pair
-        }
-    
-        try {
-            const response = await this.requestAPI('/market/exchange-plate-mini', 'get', parameters);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data;
-
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
-            } 
-            if (json=="") throw new Error(`${funcName} ${pair} is not found`);
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
+            }
 
             return json;
         } catch (error) {
@@ -492,553 +630,235 @@ class Bitmusa {
         }
     }
 
+    async closeAllFuturesPositions(symbol = null) {
+        const funcName = "[closeAllFuturesOrders]:";
 
-
-    async fetchKline(targetSymbol = null, baseSymbol = "USDT", interval = "1m", startTime = null, endTime = null) {
-        const funcName = '[getKline]:';
-
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const pair = `${targetSymbol}/${baseSymbol}`;
-
-        // only supports 1m, 5m, 15m, 30m, 1d, 1w, 1M
-        const supportedIntervals = ['1m', '5m', '15m', '30m', '1h', '1d', '1w', '1M'];
-        if(!supportedIntervals.includes(interval)) throw new Error(`${funcName} interval is not supported: ${interval}, it must be one of [${supportedIntervals}]`);
-
-        if(interval === '1m') interval = '1';        
-        else if(interval === '30m') interval = '30';
-        else if(interval === '60m' || interval === '1h') interval = '60';
-
-        var options = {
-            symbol: `${pair}`,
-            from : startTime,
-            to : endTime,
-            resolution : interval
-        };
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        symbol = symbol.toUpperCase();
 
         try {
-            const response = await this.requestAPI('/market/history', 'get', options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
+            const response = await this.requestFuturesAPI(`/api/v1/future/position/close/all?ticker=${symbol}`, "post");
             const json = response.data;
-            //console.log(json);
-            if ((json.code) && (json.code !== 0))
-            {
-                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
             return json;
-        }catch (error) {
+        } catch (error) {
             throw new Error(`${error.message}`);
         }
     }
 
+    async futuresRecentTrades(symbol, size = 20) {
+        const funcName = "[futuresRecentTrades]:";
 
-    async fetchFutureRecentTrades(targetSymbol = null, baseSymbol = "USDT", pageSize = 50) {
-        const funcName = '[getRecentTrades]:';
-
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        if (pageSize == 0) throw new Error(`${funcName} pageSize is 0`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const pair = `${targetSymbol}${baseSymbol}`;
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        symbol = symbol.toUpperCase();
 
         var parameters = {
-            ticker : pair,
-            size : pageSize
-        }
+            ticker: symbol,
+            size: size,
+        };
 
         try {
-            const response = await this.requestFutureAPI('/future-market-trade/', 'get', parameters);
-            if (response.status === 200) {
-                const json = response.data;
+            const response = await this.requestFuturesAPI("/api/v1/future/market/trade", "get", parameters);
+            const json = response.data;
 
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
+
+            return json.data;
         } catch (error) {
             throw new Error(`${error.message}`);
         }
     }
 
-    async fetchFutureOrderbook(targetSymbol = "", baseSymbol = "TUSDT", size = 50) {
-        const funcName = '[futureOrderbook]:';
+    async futuresLeverage(symbol = null, leverage = 1) {
+        const funcName = "[futuresLeverage]:";
 
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const pair = `${targetSymbol}${baseSymbol}`;
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!leverage) throw new Error(`${funcName} leverage is blank`);
+
+        symbol = symbol.toUpperCase();
+
+        var options = {
+            ticker: symbol,
+            leverage: leverage,
+        };
+
+        try {
+            const response = await this.requestFuturesAPI("/api/v1/future/leverage", "post", options);
+            const json = response.data;
+
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
+            }
+
+            return json;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async futuresOrderbook(symbol = null, size = 50) {
+        const funcName = "[futuresOrderbook]:";
+
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        symbol = symbol.toUpperCase();
 
         var parameters = {
-            ticker : pair,
-            size : size
-        }
-
-        try {
-            const response = await this.requestFutureAPI('/future-orderbook/', 'get', parameters);
-            if (response.status === 200) {
-                const json = response.data;
-
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
-
-    async openFuturePosition(targetSymbol = null, baseSymbol = "TUSDT", margin_mode = 0, position = "buy", order_type = 1, leverage = 10, order_price = 1, order_qty = 0) {
-        const funcName = '[openFuturePosition]:';
-
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const pair = `${targetSymbol}${baseSymbol}`;
-
-        position = position.toUpperCase();
-        if (position != "BUY" && position != "SELL") throw new Error("Position must be BUY or SELL");
-        if (position == "BUY") position = 0; // long
-        if (position == "SELL") position = 1; // short
-
-        var options = {
-            direction: 0, // 0: Open, 1: Close
-            ticker: `${pair}`,
-            margin_mode: margin_mode,
-            position: position,
-            order_type: order_type,
-            leverage: leverage,
-            order_price: order_price,
-            order_qty: order_qty
+            ticker: symbol,
+            size: size,
         };
 
         try {
-            const response = await this.requestFutureAPI('/future-order/', 'post', options);
-            if (response.status === 200) {
-                const json = response.data;
+            const response = await this.requestFuturesAPI("/api/v1/future/market/orderbook", "get", parameters);
+            const json = response.data;
 
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
 
-        
-    }
-
-    async closeFuturePosition(targetSymbol = null, baseSymbol = "TUSDT", margin_mode = 0, position = "buy", order_type = 1, leverage = 10, order_price = 1, order_qty = 0) {
-        const funcName = '[closeFuturePosition]:';
-
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const pair = `${targetSymbol}${baseSymbol}`;
-
-        position = position.toUpperCase();
-        if (position != "BUY" && position != "SELL") throw new Error("Position must be BUY or SELL");
-        if (position == "BUY") position = 0; // long
-        if (position == "SELL") position = 1; // short
-
-        var options = {
-            direction: 0, // 0: Open, 1: Close
-            ticker: `${pair}`,
-            margin_mode: margin_mode,
-            position: position,
-            order_type: order_type,
-            leverage: leverage,
-            order_price: order_price,
-            order_qty: order_qty
-        };
-
-        try {
-            const response = await this.requestFutureAPI('/future-order/', 'post', options);
-            if (response.status === 200) {
-                const json = response.data;
-
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-
-        
-    }
-
-    async cancelFutureOrder(order_id) {
-        const funcName = '[cancelFutureOrder]:';
-
-        if (!order_id) throw new Error(`${funcName} order_id is blank`);
-
-        var options = {
-        };
-
-        try {
-            const response = await this.requestFutureAPI(`/future-order/cancel/${order_id}`, 'put', options);
-            if (response.status === 200) {
-                const json = response.data;
-
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
-            }
+            return json.data;
         } catch (error) {
             throw new Error(`${error.message}`);
         }
     }
 
-    async cancelAllFutureOrders(targetSymbol = null, baseSymbol = "TUSDT") {
-        const funcName = '[cancelAllFutureOrders]:';
-        var pair = null;
+    async futuresOpenOrders(symbol = null, start_time = null, size = 50) {
+        const funcName = "[futuresOpenOrders]:";
 
-        if (!targetSymbol)
-        {
-            pair = "all";
-        } else {
-            targetSymbol = targetSymbol.toUpperCase();
-            baseSymbol = baseSymbol.toUpperCase();
-    
-            pair = `${targetSymbol}${baseSymbol}`;    
-        }
-        
-        var options = {
-            ticker: `${pair}`
-        };
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
 
-        try {
-            const response = await this.requestFutureAPI('/future-order/cancel_all', 'put', options);
-            if (response.status === 200) {
-                const json = response.data;
-
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
-
-    async closeAllFutureOrders(targetSymbol = null, baseSymbol = "TUSDT") {
-        const funcName = '[closeAllFutureOrders]:';
-
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const pair = `${targetSymbol}${baseSymbol}`;
-        
-        var options = {
-            ticker: `${pair}`
-        };
-
-        try {
-            const response = await this.requestFutureAPI('/future-position/close_all', 'put', options);
-            if (response.status === 200) {
-                const json = response.data;
-
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
-
-    async getFutureOrder(order_id) {
-        throw new Error('Not implemented yet');
-    }
-
-    async fetchFutureOpenOrders(targetSymbol = null, baseSymbol = "TUSDT", size=50, start_time=null) {
-        const funcName = '[fetchFutureOrders]:';
-
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const pair = `${targetSymbol}${baseSymbol}`;
+        symbol = symbol.toUpperCase();
 
         var options = {
-            ticker: `${pair}`,
-            size: size
+            ticker: symbol,
+            size: size,
         };
 
         if (start_time) options = { ...options, start_time: start_time };
 
         try {
-            const response = await this.requestFutureAPI('/future-order/', 'get', options);
-            if (response.status === 200) {
-                const json = response.data;
+            const response = await this.requestFuturesAPI("/api/v1/future/order", "get", options);
+            const json = response.data;
 
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
+
+            return json.data;
         } catch (error) {
             throw new Error(`${error.message}`);
         }
     }
 
-    async fetchFutureOrders(targetSymbol = null, baseSymbol = "TUSDT", size = 50, direction = null, position = null, order_type = null, order_status = null, start_time = null, end_time = null) {
-        const funcName = '[fetchFutureOrders]:';
-
-        var pair = null;
-        var options = {
-            size: size
-        };
-
-        if (!targetSymbol)
-        {
-            targetSymbol = targetSymbol.toUpperCase();
-            baseSymbol = baseSymbol.toUpperCase();
-            pair = `${targetSymbol}${baseSymbol}`;
-            options = { ...options, ticker: `${pair}` };
-        }
-        if (direction!==null) options = { ...options, direction: direction }; // 0:open, 1:close
-        if (position!==null) options = { ...options, position: position }; // 0:long, 1:short
-        if (order_type!==null) options = { ...options, order_type: order_type }; //0: market, 1: limit, 2: take profit, 3: stop loss, 4: liquidation
-        if (order_status!==null) options = { ...options, status: order_status }; //2: cancelled, 3: filled
-        if (start_time!==null) options = { ...options, start_time: start_time }; // timestamp millisecond
-        if (end_time!==null) options = { ...options, end_time: end_time }; // timestamp millisecond
-
-
-        try {
-            const response = await this.requestFutureAPI('/future-order/history', 'get', options);
-            if (response.status === 200) {
-                const json = response.data;
-
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
-    
-    async fetchFutureTrades(targetSymbol = null, baseSymbol = "TUSDT", size=50, start_time = null, end_time = null) {
-        const funcName = '[fetchFutureTrades]:';
-
-        var pair = null;
-        var options = {
-            size: size
-        };
-        if (!targetSymbol)
-        {
-            
-        } else {
-            targetSymbol = targetSymbol.toUpperCase();
-            baseSymbol = baseSymbol.toUpperCase();
-            pair = `${targetSymbol}${baseSymbol}`;
-            options = { ...options, ticker: `${pair}` };
-        }
-
-        if (start_time!==null) options = { ...options, start_time: start_time };
-        if (end_time!==null) options = { ...options, end_time: end_time };
-
-        try {
-            const response = await this.requestFutureAPI('/future-trade/history', 'get', options);
-            if (response.status === 200) {
-                const json = response.data;
-
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
-
-    async fetchFuturePositions(targetSymbol = null, baseSymbol = "TUSDT") {
-        const funcName = '[fetchFuturePositions]:';
-
-        var pair = null;
-        var options = {
-        };
-
-        if (!targetSymbol) 
-        {
-            options = {};
-        } else {
-            targetSymbol = targetSymbol.toUpperCase();
-            baseSymbol = baseSymbol.toUpperCase();
-            const pair = `${targetSymbol}${baseSymbol}`;
-
-            options = {...options, ticker: `${pair}` };
-        }
-        
-
-        try {
-            const response = await this.requestFutureAPI('/future-position/', 'get', options);
-            if (response.status === 200) {
-                const json = response.data;
-
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
-
-    async fetchFutureBalance() {
-        const funcName = '[fetchFutureBalance]:';
-
-        try {
-            const response = await this.requestFutureAPI('/future-wallet/', 'get', {});
-            if (response.status === 200) {
-                const json = response.data;
-
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
-
-    async getFutureBalance(symbol = null) {
-        const funcName = '[getFutureBalance]:';
+    async futuresExposure(symbol = null) {
+        const funcName = "[futuresExposure]:";
 
         if (!symbol) throw new Error(`${funcName} symbol is blank`);
         symbol = symbol.toUpperCase();
 
-        try {
-            const response = await this.requestFutureAPI('/future-wallet/', 'get', {});
-            if (response.status === 200) {
-                const json = response.data;
-                const balance = json.find((item) => item.symbol === symbol);
-
-                return balance;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            throw new Error(`${error.message}`);
-        }
-    }
-
-    async fetchFutureTickers() {
-        const funcName = '[fetchFutureTickers]:';
-
-
         var options = {
-            ticker : "TBTCTUSDT" // required, not supported all tickers
+            ticker: symbol,
         };
 
         try {
-            const response = await this.requestFutureAPI('/future-board/', 'get', options);
-            if (response.status === 200) {
-                const json = response.data;
+            const response = await this.requestFuturesAPI("/api/v1/future/position", "get", options);
+            const json = response.data;
 
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
+            }
+
+            return json.data[0];
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async futuresBalance(symbol = null) {
+        const funcName = "[futuresBalance]:";
+
+        try {
+            const response = await this.requestFuturesAPI("/api/v1/future/wallet", "get", {});
+            const json = response.data;
+
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
+            }
+
+            if (!symbol) {
+                return json.data;
             } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                const ticker = json.data.find((item) => item.symbol == symbol);
+                if (!ticker) throw new Error(`${funcName} ${symbol} is not found`);
+
+                return ticker;
             }
         } catch (error) {
             throw new Error(`${error.message}`);
         }
     }
 
-    async getFutureTicker(targetSymbol = null, baseSymbol = "TUSDT") {
-        const funcName = '[getFutureTicker]:';
-
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const pair = `${targetSymbol}${baseSymbol}`;
+    async futuresTickers() {
+        const funcName = "[futuresTickers]:";
 
         var options = {
-            ticker: `${pair}`
+            ticker: "BTCUSDT", // required, not supported all tickers
         };
 
         try {
-            const response = await this.requestFutureAPI('/future-board/', 'get', options);
-            if (response.status === 200) {
-                const json = response.data;
+            const response = await this.requestFuturesAPI("/api/v1/future/market", "get", options);
+            const json = response.data;
 
-                return json;
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
+
+            return json.data;
         } catch (error) {
             throw new Error(`${error.message}`);
         }
     }
 
-    async getFuturePrice(targetSymbol = null, baseSymbol = "TUSDT") {
-        const funcName = '[getFuturePrice]:';
-    
-        if (!targetSymbol) throw new Error(`${funcName} targetSymbol is blank`);
-        targetSymbol = targetSymbol.toUpperCase();
-        baseSymbol = baseSymbol.toUpperCase();
-        const pair = `${targetSymbol}${baseSymbol}`;
-    
+    async futuresPrices(symbol = null) {
+        const funcName = "[futuresPrices]:";
+
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+
+        symbol = symbol.toUpperCase();
+
         var options = {
-            ticker: `${pair}`
+            ticker: symbol,
         };
-    
+
         try {
-            const response = await this.requestFutureAPI('/future-board/', 'get', options);
-            
-            if (response.status === 200) {
-                const json = response.data;
-                
-                if (json.ticker === pair) {
-                    return json.last_price;
-                }
-                
-                throw new Error(`${funcName} ${pair} is not found`);
-            } else if (response.status === 400) {
-                throw new Error(`${funcName} ${response.data.detail.msg} [code:${response.data.detail.code}]`);
-            } else {
-                throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            const response = await this.requestFuturesAPI("/api/v1/future/market", "get", options);
+            const json = response.data;
+
+            if (json.data.ticker === symbol) {
+                return json.data.last_price;
+            } else if (json.code !== 0) {
+                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
+
+            throw new Error(`${funcName} ${symbol} is not found`);
         } catch (error) {
-            throw new Error(`${error.message}`);
+            throw new Error(`${funcName} An error occurred while fetching the future price:`, error.message);
         }
     }
-
-    
-
-
-
 }
 
 // export the class

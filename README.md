@@ -1,5 +1,5 @@
 # node-bitmusa-api
-The node-bitmusa-api is a node.js module designed for use with the Bitmusa API. Created to assist you in crafting your own projects that merge with Bitmusa - a platform launched in 2022 - this project's main objective is to provide comprehensive coverage of the API.
+The node-bitmusa-api is a node.js module developed to interact with the Bitmusa API. Created to assist you in crafting your own projects that merge with Bitmusa - a platform launched in 2022 - this project's main objective is to provide comprehensive coverage of the API.
 
 
 ### quick start
@@ -29,6 +29,102 @@ bitmusa.balance().then((res) => {
 });
 ```
 
+# Bitmusa Futures API
+For details, please review sample codes provided in the "example" folder.
+
+#### Futures Balance
+```js
+await bitmusa.futuresBalance("USDT")
+```
+
+#### Futures Limit Order
+```js
+await bitmusa.futuresOrder((symbol = "BTCUSDT"), (side = "BUY"), (quantity = 1), (price = 31000))
+```
+
+```js
+await bitmusa.futuresLimitBuy((symbol = "BTCUSDT"), (quantity = 1), (price = 29000))
+```
+
+```js
+await bitmusa.futuresLimitSell((symbol = "BTCUSDT"), (quantity = 1), (price = 29000))
+```
+
+#### Futures Market Order
+```js
+await bitmusa.futuresOrder((symbol = "BTCUSDT"), (side = "BUY"), (quantity = 1), (price = false))
+```
+
+```js
+await bitmusa.futuresMarketBuy((symbol = "BTCUSDT"), (quantity = 1))
+```
+
+```js
+await bitmusa.futuresMarketSell((symbol = "BTCUSDT"), (quantity = 1))
+```
+
+#### Futures Close Order Example
+```js
+await bitmusa.futuresOrder((symbol = "BTCUSDT"), (side = "BUY"), (quantity = 1), (price = 31000), (params = { closePosition: true }))
+```
+
+#### Futures Positions
+```js
+await bitmusa.futuresExposure("BTCUSDT")
+```
+
+#### Futures Open Orders
+```js
+await bitmusa.futuresOpenOrders((symbol = "BTCUSDT"))
+```
+
+#### Futures Prices
+```js
+await bitmusa.futuresPrices("BTCUSDT")
+```
+
+# Bitmusa Spot Trading
+
+#### balance
+```js
+await bitmusa.balance()
+```
+
+#### Limit Order
+```js
+await bitmusa.order((symbol = "ETH/USDT"), (direction = "BUY"), (quantity = 10), (price = 2000))
+```
+
+```js
+await bitmusa.limitBuy((symbol = "ETH/USDT"), (quantity = 10), (price = 2000))
+```
+
+```js
+await bitmusa.limitSell((symbol = "ETH/USDT"), (quantity = 10), (price = 2000))
+```
+
+#### Market Order
+```js
+await bitmusa.order((symbol = "ETH/USDT"), (direction = "BUY"), (quantity = 10), (price = false))
+```
+
+```js
+await bitmusa.marketSell((symbol = "ETH/USDT"), (quantity = 10))
+```
+
+```js
+await bitmusa.marketBuy((symbol = "ETH/USDT"), (quantity = 10))
+```
+
+#### Prices
+```js
+await bitmusa.prices((symbol = "")) // for all pairs
+```
+
+#### Order Cancel
+```js
+await bitmusa.cancelOrder((orderId = "Q168911032722964"))
+```
 
 
 # API Reference
@@ -36,121 +132,52 @@ bitmusa.balance().then((res) => {
 ### Spot
 
 #### Order
-- createOrder(): Creates an order.
-- cancelOrder(): Cancels an order. 
-- cancelAllOrders(): Cancels all orders.
-- fetchOpenOrders(): Gets a list of all open orders. [not supported specific market]
-- fetchOrders() : Gets the list of orders in a specific market.
-- getOrder(): Gets details of a specific order. [not supported]
+- order(): Places an order
+- limitBuy(): Places a limit buy order
+- limitSell(): Places a limit sell order
+- marketBuy(): Places a market buy order
+- marketSell(): Places a market sell order 
+- openOrders(): Retrieves a list of all current open orders
+- cancelOrder(): Cancel an order
+- cancelAllOrders(): Cancels all current open orders
 #### Trade
-- fetchTrades() : Retrieves the list of trades in a specific market.
-- fetchRecentTrades(): Retrieves the recent trades of a specific market.
+- recentTrades(): Retrieves the most recent trades on the spot market.
 #### Market
-- fetchTickers() : Retrieves the ticker information
-- getTicker() : Gets the current ticker information for a specific market.
-- fetchOrderBook() : Retrieves order book information for a specific market.
-- fetchMarkets(): Gets the list of available markets. [not supported]
-- getMarket() : Gets the details of a specific market. [not supported]
+- prices(): Retrieves the current prices for all symbols. If no symbol is specified, it returns prices for all symbols.
+- tickers(): Retrieves current ticker information for all symbols. If no symbol is specified, it returns ticker information for all symbols.
+- orderBook(): Retrieves the current order book.
 #### Asset
-- fetchTransations() : Retrieves deposit and withdrawal history.
-- fetchBalance() : Retrieves the balance of a held asset.
-- getBalance(): Get specific asset balance.
+- balance():Retrieves the balance of a specific asset. If no asset is specified, it returns balances for all assets.
 - requestWithdrawal(): Requests a withdrawal. [not supported]
 - createDepositAddress(): Creates a deposit address. [not supported]
 #### Other
-- fetchTradingFees() : Retrieves transaction fee information. [not supported]
-- getTradingFee() : get transaction fee information for specific token. [not supported]
-- fetchTransactionFees() : Retrieves transaction fee information. [not supported]
-- getTransactionFee() : get transaction fee information for specific token. [not supported]
+- tradingFees(): Retrieves transaction fee information. [not supported]
+- transactionFees(): Retrieves transaction fee information. [not supported]
 
 ### Futures
+
 #### Order
-- openFutureOrder(): Creates a future order.
-- closeFutureOrder(): Close a future order.
-- closeAllFutureOrders(): Close all future orders.
+- futuresOrder(): Places an order 
+- futuresLimitBuy(): Places a limit buy order
+- futuresLimitSell(): Places a limit sell order
+- futuresMarketBuy(): Places a market buy order
+- futuresMarketSell(): Places a market sell order
 - cancelFutureOrder(): Cancels a futures order.
 - cancelAllFutureOrders(): Cancels all futures orders.
-
+- closeAllFuturesPositions(): Closes all open positions
+- futuresLeverage(): Adjusts the leverage for the futures trading
 #### Trade
-- fetchFuturePositions(): Gets details of a specific futures order position.
-- fetchFutureOpenOrders(): Gets a list of open futures orders.
-- fetchFutureOrders() : Gets a list of futures orders in a specific market.
-- fetchFutureTrades() : Retrieves a list of futures trades in a specific market.
-
+- futuresOpenOrders(): Gets a list of open futures orders.
+- futuresRecentTrades(): Retrieves the most recent trades
+- futuresExposure(): Retrieves information on the current open positions
 #### Market
-- fetchFutureTickers() : Retrieves the current futures ticker information for a specific market. [not supported]
-- getFutureTicker() : Retrieves the current futures ticker information for a specific market.
-- getFuturePrice() : Get futures price for a specific market.
-- fetchFutureMarkets(): Gets the list of available futures markets. [not supported]
-- getFutureMarket(): Gets the details of futures transactions in a specific market. [not supported]
-- fetchFutureOrderBook() : Retrieves futures price information for a specific market.
-- fetchFutureRecentTrades(): Retrieves the recent futures transaction history of a specific market.
-
+- futuresPrices(): Retrieves the current prices for all symbols. If no symbol is specified, it returns prices for all symbol
+- futuresTickers(): Retrieves current ticker information for all symbols. If no symbol is specified, it returns ticker information for all symbols
+- futuresOrderBook(): Retrieves the current order book
 #### Asset
-- fetchFutureBalance(): Retrieves the balance of assets held in the futures account.
-- getFutureBalance(): Gets the balance of assets held in the futures account.
-- getFutureTransactions(): Gets the history of futures account deposits and withdrawals. [not supported]
-- requestFutureWithdrawal() : Requests a withdrawal from a futures account. [not supported]
-
+- futuresBalance(): Retrieves the balance of assets held. If no symbol is specified, it returns prices for all symbols
+- futuresTransactions(): Gets the history of futures account deposits and withdrawals [not supported]
+- requestFuturesWithdrawal() : Requests a withdrawal from a futures account [not supported]
 #### Other
-- getFutureTradingFees(): Retrieves futures trading fee information. [not supported]
+- futuresTradingFees(): Retrieves futures trading fee information [not supported]
 
-
-# Example
-
-
-## 1. signIn
-### **[Note]** this is private api. so you must grant permission to use this api. send email to support@bitmusa.com
-```js
-bitmusa.signIn("[id]","[password]").then(result => {
-    console.log(result);
-}).catch(err => {
-    console.log(err);
-});
-```
-### OK
-```js
-{
-  data: {
-    id: 1234,
-    email: 'test@test.com',
-    country: '1',
-    phone: '34151234',
-    token: '0ec14b76-27b3-4bad-940a-044c116f0cbe',
-    googleState: null,
-    status: null,
-    googleKey: null,
-    nickname: '1234'
-  },
-  code: 0,
-  message: 'SUCCESS'
-}
-```
-### Fail
-```js
-{ 
-    data: null, 
-    code: 20006, 
-    message: 'Incorrect username or password' 
-}
-
-```
-
-## createOrder
-```js
-bitmusa.createOrder("BUY", "BTC/USDT","0.0001","LIMIT_PRICE", "23500.0").then(result => {
-    console.log(result);
-}).catch(err => {
-    console.log(err);
-});
-```
-
-### OK
-```js
-{ data: 'E167795149792251', code: 0, message: 'success' }
-```
-
-### Fail
-```js
-{ code: 4000, message: 'need sign in' }
-```
