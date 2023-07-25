@@ -1,6 +1,6 @@
 {
   "name": "node-bitmusa-api",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "The node-bitmusa-api is a node.js module developed to interact with the Bitmusa API.",
   "author": "satoshi@bitninja.dev, katana@bitninja.dev",
   "dependencies": {
