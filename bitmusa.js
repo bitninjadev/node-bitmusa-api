@@ -1,6 +1,7 @@
 const axios = require("axios");
 const request = require("request");
 const querystring = require("querystring");
+const FormData = require('form-data');
 
 class Bitmusa {
     constructor(options = {}) {
@@ -444,6 +445,38 @@ class Bitmusa {
             }
             if (json == "") throw new Error(`${funcName} ${symbol} is not found`);
 
+            return json;
+        } catch (error) {
+            throw new Error(`${error.message}`);
+        }
+    }
+
+    async klines(symbol = null, interval = "1m", startTime = null, endTime = null) {
+        const funcName = "[klines]:";
+        
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!interval) throw new Error(`${funcName} interval is blank`);
+        if (!startTime) throw new Error(`${funcName} startTime is blank`);
+        if (!endTime) throw new Error(`${funcName} endTime is blank`);
+    
+        symbol = symbol.toUpperCase();
+    
+        // create form data
+        const formData = new URLSearchParams();
+        formData.append('symbol', symbol);
+        formData.append('from', String(startTime));
+        formData.append('to', String(endTime));
+        formData.append('resolution', interval);
+        
+        try {   
+            const response = await this.requestAPI("/api/v1/spot/market/kline/history", "get", formData);
+            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
+            const json = response.data.data;
+    
+            if (json.code && json.code !== 0) {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+            
             return json;
         } catch (error) {
             throw new Error(`${error.message}`);
