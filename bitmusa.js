@@ -483,7 +483,16 @@ class Bitmusa {
         }
     }
 
-    async futuresOrder(symbol = null, side = null, quantity = null, price = null, params = { marginMode: "ISOLATED", closePosition: false }) {
+    async futuresOrder(symbol = null, side = null, quantity = null, price = null,
+        params = { 
+        marginMode: "ISOLATED", 
+        closePosition: false, 
+        reduceOnly: false, 
+        postOnly: false,
+        takeProfit: {},
+        stopLoss: {},
+        }){
+            
         const funcName = "[futuresOrder]:";
 
         if (!symbol) throw new Error(`${funcName} symbol is blank`);
@@ -528,6 +537,33 @@ class Bitmusa {
         if (side === "BUY") side = 0;
         if (side === "SELL") side = 1;
 
+        function setOrderOptions(orderType, orderParams) {
+            if (!orderParams || Object.keys(orderParams).length === 0) {
+                return {};
+            }
+        
+            const triggerTypeMap = { "MARK": 1, "LAST": 2 };
+            const orderTypeMap = { "MARKET": 0, "LIMIT": 1 };
+        
+            const triggerType = triggerTypeMap[orderParams.triggerType.toUpperCase()];
+            const orderTypeNum = orderTypeMap[orderParams.orderType.toUpperCase()];
+        
+            if (orderTypeNum === 1 && !orderParams.orderPrice) {
+                throw new Error(`[futuresOrder] ${orderType} order price must be specified for limit ${orderType} order`);
+            }
+        
+            return {
+                [`is_${orderType}`]: true,
+                [`${orderType}_trigger_type`]: triggerType,
+                [`${orderType}_trigger_price`]: orderParams.triggerPrice,
+                [`${orderType}_order_type`]: orderTypeNum,
+                [`${orderType}_order_price`]: orderParams.orderPrice,
+            };
+        }
+
+        const takeProfitOptions = setOrderOptions("take_profit", params.takeProfit);
+        const stopLossOptions = setOrderOptions("stop_loss", params.stopLoss);
+
         var options = {
             direction: direction, // 0: Open, 1: Close
             ticker: `${symbol}`,
@@ -536,8 +572,13 @@ class Bitmusa {
             order_type: type,
             order_price: price,
             order_qty: quantity,
-        };
+            is_reduce_only: params.reduceOnly,
+            is_post_only: params.postOnly,
+            ...takeProfitOptions,
+            ...stopLossOptions
 
+        };
+        
         try {
             const response = await this.requestFuturesAPI("/api/v1/future/order", "post", options);
             const json = response.data;
