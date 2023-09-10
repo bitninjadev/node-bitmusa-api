@@ -341,8 +341,6 @@ class Bitmusa {
     async tickers(symbol = null) {
         const funcName = "[tickers]:";
 
-        symbol = symbol.toUpperCase();
-
         try {
             const response = await this.requestAPI("/api/v1/spot/market", "get");
             if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
