@@ -481,6 +481,73 @@ class Bitmusa {
         }
     }
 
+    async orderHistory(symbol = null, orderStatus = null, size = 10, startTime = null, endTime = null){
+        const funcName = "[orderHistory]:";
+
+        if(!symbol) throw new Error(`${funcName} symbol is blank`);
+        if(!orderStatus) throw new Error(`${funcName} orderStatus is blank`);
+        if(!startTime && !endTime && !size) throw new Error(`${funcName} either timestamp or size must be specified`);
+    
+        symbol = symbol.toUpperCase();
+        orderStatus = orderStatus.toUpperCase();
+
+        var parameters = {
+            symbol: symbol,
+            startTime: startTime,
+            endTime: endTime,
+            status: orderStatus,
+            size: size, 
+        }
+
+        try{
+            const response = await this.requestAPI("/api/v1/spot/order/history", "get", parameters);
+            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
+            const json = response.data.data;
+    
+            if (json.code && json.code !== 0) {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+            
+            return json;
+        }catch(error){
+            throw new Error(`${error.message}`);
+        }
+
+    }
+
+    async tradeHistory(symbol = null, startTime = null, endTime = null, direction = "BUY", size = 10){
+        const funcName = "[tradeHistory]:";
+
+        if(!symbol) throw new Error(`${funcName} symbol is blank`);
+        if(!startTime && !endTime && !size) throw new Error(`${funcName} either timestamp or size must be specified`);
+        if(!direction || direction.toUpperCase() !== "BUY" && direction.toUpperCase() !== "SELL") throw new Error(`${funcName} direction must be either BUY or SELL`);
+
+        symbol = symbol.toUpperCase();
+        direction = direction.toUpperCase();
+
+        var parameters = {
+            symbol: symbol,
+            startTime: startTime,
+            endTime: endTime,
+            direction: direction,
+            size: size,
+        }
+
+        try{
+            const response = await this.requestAPI("/api/v1/spot/trade/history", "get", parameters);
+            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
+            const json = response.data.data;
+    
+            if (json.code && json.code !== 0) {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+            
+            return json;
+        }catch(error){
+            logger.error(error)
+        }
+    }
+
     async futuresOrder(symbol = null, side = null, quantity = null, price = null,
         params = { 
         marginMode: "ISOLATED", 
