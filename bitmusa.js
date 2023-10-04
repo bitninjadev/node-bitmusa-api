@@ -645,7 +645,7 @@ class Bitmusa {
         };
         
         try {
-            const response = await this.requestFuturesAPI("/api/v1/future/order", "post", options);
+            const response = await this.requestFuturesAPI("/api/v2/future/order", "post", options);
             const json = response.data;
 
             if (json.code !== 0) {
@@ -734,7 +734,7 @@ class Bitmusa {
         if (!order_id) throw new Error(`${funcName} order_id is blank`);
 
         try {
-            const response = await this.requestFuturesAPI(`/api/v1/future/order/cancel/${order_id}`, "post");
+            const response = await this.requestFuturesAPI(`/api/v2/future/order/cancel/${order_id}`, "post");
             const json = response.data;
 
             if (json.code !== 0) {
@@ -755,7 +755,7 @@ class Bitmusa {
         symbol = symbol.toUpperCase();
 
         try {
-            const response = await this.requestFuturesAPI(`/api/v1/future/order/cancel/all?ticker=${symbol}`, "post");
+            const response = await this.requestFuturesAPI(`/api/v2/future/order/cancel/all?ticker=${symbol}`, "post");
             const json = response.data;
 
             if (json.code !== 0) {
@@ -776,7 +776,7 @@ class Bitmusa {
         symbol = symbol.toUpperCase();
 
         try {
-            const response = await this.requestFuturesAPI(`/api/v1/future/position/close/all?ticker=${symbol}`, "post");
+            const response = await this.requestFuturesAPI(`/api/v2/future/position/close/all?ticker=${symbol}`, "post");
             const json = response.data;
 
             if (json.code !== 0) {
@@ -802,7 +802,7 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v1/future/market/trade", "get", parameters);
+            const response = await this.requestFuturesAPI("/api/v2/future/market/trade", "get", parameters);
             const json = response.data;
 
             if (json.code !== 0) {
@@ -830,7 +830,7 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v1/future/leverage", "post", options);
+            const response = await this.requestFuturesAPI("/api/v2/future/leverage", "post", options);
             const json = response.data;
 
             if (json.code !== 0) {
@@ -856,7 +856,7 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v1/future/market/orderbook", "get", parameters);
+            const response = await this.requestFuturesAPI("/api/v2/future/market/orderbook", "get", parameters);
             const json = response.data;
 
             if (json.code !== 0) {
@@ -885,7 +885,7 @@ class Bitmusa {
         if (start_time) options = { ...options, start_time: start_time };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v1/future/order", "get", options);
+            const response = await this.requestFuturesAPI("/api/v2/future/order", "get", options);
             const json = response.data;
 
             if (json.code !== 0) {
@@ -910,7 +910,7 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v1/future/position", "get", options);
+            const response = await this.requestFuturesAPI("/api/v2/future/position", "get", options);
             const json = response.data;
 
             if (json.code !== 0) {
@@ -928,7 +928,7 @@ class Bitmusa {
         const funcName = "[futuresBalance]:";
 
         try {
-            const response = await this.requestFuturesAPI("/api/v1/future/wallet", "get", {});
+            const response = await this.requestFuturesAPI("/api/v2/future/wallet", "get", {});
             const json = response.data;
 
             if (json.code !== 0) {
@@ -957,7 +957,7 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v1/future/market", "get", options);
+            const response = await this.requestFuturesAPI("/api/v2/future/market", "get", options);
             const json = response.data;
 
             if (json.code !== 0) {
@@ -983,7 +983,7 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v1/future/market", "get", options);
+            const response = await this.requestFuturesAPI("/api/v2/future/market", "get", options);
             const json = response.data;
 
             if (json.data.ticker === symbol) {
