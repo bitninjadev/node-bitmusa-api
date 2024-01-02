@@ -1,66 +1,48 @@
+/* ============================================================
+ * node-bitmusa-api
+ * https://github.com/satoshi-bitninja/node-bitmusa-api
+ * ============================================================
+ * Copyright 2023 bitninja
+ * Released under the MIT License
+* ============================================================ */
+
 const axios = require("axios");
-const request = require("request");
-const querystring = require("querystring");
-const FormData = require('form-data');
 
 class Bitmusa {
     constructor(options = {}) {
+        this.baseUrl = "https://openapi.bitmusa.com"
         this.options = this.getDefaultOptions();
 
-        if (typeof options === "string") {
+        if (typeof options !== "object") {
             throw new Error("options must be an object");
         } else if (typeof options === "object") {
-            if (!options.xApiKey || !options.authKey) throw new Error("xApiKey or authKey is blank");
 
-            this.setApiKey(options.xApiKey);
-            this.setAuthKey(options.authKey);
-
-            if (options.baseURL) {
-                this.setBaseURL(options.baseURL);
+            if (typeof options.timeout !== 'undefined') this.options.timeout = options.timeout;
+            if (typeof options.xApiKey !== 'undefined' && typeof options.authKey !== 'undefined') {
+                this.options.xApiKey = options.xApiKey;
+                this.options.authKey = options.authKey;
+            } else {
+                throw new Error('xApiKey and authKey must be specified upon creating bitmusa instance')
             }
-            if (options.timeout) {
-                this.setTimeout(options.timeout);
+
+            if (options.useTestnet === true) {
+                this.options.useTestnet = true;
+                if (typeof options.baseUrl !== 'undefined') {
+                    this.baseUrl = options.baseUrl;
+                } else {
+                    throw new Error("baseUrl is required when useTestnet is set to true");
+                }
             }
         }
     }
 
     getDefaultOptions() {
         return {
-            baseURL: "https://openapi.bitmusa.com",
+            xApiKey: null,
+            authKey: null,
             timeout: 1000,
+            useTestnet: false,
         };
-    }
-
-    setBaseURL(baseURL) {
-        this.options.baseURL = baseURL;
-    }
-
-    getBaseURL() {
-        return this.options.baseURL;
-    }
-
-    setAuthKey(authKey) {
-        this.options.authKey = authKey;
-    }
-
-    getAuthKey() {
-        return this.options.authKey;
-    }
-
-    setApiKey(xApiKey) {
-        this.options.xApiKey = xApiKey;
-    }
-
-    getApiKey() {
-        return this.options.xApiKey;
-    }
-
-    setTimeout(timeout) {
-        this.options.timeout = timeout;
-    }
-
-    getTimeout() {
-        return this.options.timeout;
     }
 
     async requestAPI(path, method, parameters = null) {
@@ -70,7 +52,7 @@ class Bitmusa {
             "x-api-key": this.options.xApiKey,
             "Content-Type": "application/json",
         };
-        const url = `${this.options.baseURL}${path}`;
+        const url = `${this.baseUrl}${path}`;
         const requestOptions = {
             method: method,
             url: url,
@@ -84,37 +66,17 @@ class Bitmusa {
         }
         try {
             const response = await axios.request(requestOptions);
-            return response;
+            const responseData = response.data || {};
+            return { data: responseData, debug: 0 };
         } catch (error) {
-            throw new Error(`Failed to requestAPI(${path}): ${error.message}`);
-        }
-    }
-
-    async requestFuturesAPI(path, method, parameters = null) {
-        method = method.toUpperCase();
-        const headers = {
-            Authorization: `Bearer ${this.options.authKey}`,
-            "x-api-key": this.options.xApiKey,
-            "Content-Type": "application/json",
-        };
-        const url = `${this.options.baseURL}${path}`;
-        const requestOptions = {
-            method: method,
-            url: url,
-            headers: headers,
-            data: parameters,
-            responseType: "json",
-            timeout: this.options.timeout,
-        };
-        if (method === "GET") {
-            requestOptions.params = parameters;
-        }
-
-        try {
-            const response = await axios.request(requestOptions);
-            return response;
-        } catch (error) {
-            return error.response;
+            if (error.response && error.response.data) {
+                const errorData = error.response.data;
+                const errorCode = errorData.code || error.response.status;
+                const errorMessage = errorData.message || error.message;
+                return { data: { code: errorCode, message: errorMessage, debug: 1 } };
+            } else {
+                throw new Error(`Failed to requestAPI ${path}: ${error.message}`)
+            }
         }
     }
 
@@ -157,7 +119,6 @@ class Bitmusa {
 
         try {
             const response = await this.requestAPI("/api/v1/spot/order", "post", options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
 
             if (json.code !== 0) {
@@ -242,8 +203,6 @@ class Bitmusa {
 
         try {
             const response = await this.requestAPI(`/api/v1/spot/order/cancel/${orderId}`, "post");
-
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
 
             if (json.code !== 0) {
@@ -269,7 +228,6 @@ class Bitmusa {
 
         try {
             const response = await this.requestAPI(`/api/v1/spot/order/cancel/all`, "post", options);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
 
             if (json.code !== 0) {
@@ -298,7 +256,6 @@ class Bitmusa {
 
         try {
             const response = await this.requestAPI("/api/v1/spot/order", "get", parameters);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
             const json = response.data;
 
             if (json.code && json.code !== 0) {
@@ -325,8 +282,7 @@ class Bitmusa {
 
         try {
             const response = await this.requestAPI("/api/v1/spot/market/trade", "get", parameters);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data.data;
+            const json = response.data;
 
             if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -343,8 +299,8 @@ class Bitmusa {
 
         try {
             const response = await this.requestAPI("/api/v1/spot/market", "get");
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data.data;
+            const json = response.data;
+            const data = json.data;
 
             if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -353,7 +309,7 @@ class Bitmusa {
             if (!symbol) {
                 return json;
             } else {
-                const ticker = json.find((item) => item.symbol == symbol);
+                const ticker = data.find((item) => item.symbol == symbol);
 
                 if (!ticker) throw new Error(`${funcName} symbol not found`);
                 return ticker;
@@ -368,8 +324,8 @@ class Bitmusa {
 
         try {
             const response = await this.requestAPI("/api/v1/spot/market", "get");
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data.data;
+            const json = response.data;
+            const data = json.data;
 
             if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -378,7 +334,7 @@ class Bitmusa {
             if (symbol) {
                 symbol = symbol.toUpperCase();
 
-                const ticker = json.find((item) => item.symbol == symbol);
+                const ticker = data.find((item) => item.symbol == symbol);
                 if (!ticker) throw new Error(`${funcName} ${symbol} is not found`);
                 if (!ticker.close) throw new Error(`${funcName} ${symbol} close price is not found`);
                 return ticker.close;
@@ -398,9 +354,9 @@ class Bitmusa {
         const funcName = "[balance]:";
 
         try {
-            const response = await this.requestFuturesAPI("/api/v1/spot/wallet", "get");
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data.data;
+            const response = await this.requestAPI("/api/v1/spot/wallet", "get");
+            const json = response.data;
+            const data = json.data;
 
             if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -410,7 +366,7 @@ class Bitmusa {
                 symbol = symbol.toUpperCase();
                 if (symbol.split("/").length == 2) throw new Error(`${funcName} symbol must be like BTC`);
 
-                const balance = json.find((item) => item.coin.unit == symbol);
+                const balance = data.find((item) => item.coin.unit == symbol);
                 if (!balance) throw new Error(`${funcName} ${symbol} is not found`);
 
                 return balance;
@@ -418,7 +374,7 @@ class Bitmusa {
 
             return json;
         } catch (error) {
-            throw new Error(`Failed to balance: ${error.message}`);
+            throw new Error(`${error.message}`);
         }
     }
 
@@ -435,8 +391,7 @@ class Bitmusa {
 
         try {
             const response = await this.requestAPI("/api/v1/spot/market/orderbook", "get", parameters);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data.data;
+            const json = response.data;
 
             if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
@@ -449,45 +404,44 @@ class Bitmusa {
         }
     }
 
-    async klines(symbol = null, interval = "1m", startTime = null, endTime = null) {
+    async klines(symbol = null, interval = "1", startTime = null, endTime = null, size = 100) {
         const funcName = "[klines]:";
-        
+
         if (!symbol) throw new Error(`${funcName} symbol is blank`);
         if (!interval) throw new Error(`${funcName} interval is blank`);
-        if (!startTime) throw new Error(`${funcName} startTime is blank`);
-        if (!endTime) throw new Error(`${funcName} endTime is blank`);
-    
+        if (!startTime && !endTime && !size) throw new Error(`${funcName} either timestamps or size must specified`);
+
+
         symbol = symbol.toUpperCase();
-    
-        // create form data
-        const formData = new URLSearchParams();
-        formData.append('symbol', symbol);
-        formData.append('from', String(startTime));
-        formData.append('to', String(endTime));
-        formData.append('resolution', interval);
-        
-        try {   
-            const response = await this.requestAPI("/api/v1/spot/market/kline/history", "get", formData);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data.data;
-    
+
+        var parameters = {
+            symbol: symbol,
+            from: startTime,
+            to: endTime,
+            resolution: interval
+        }
+
+        try {
+            const response = await this.requestAPI("/api/v1/spot/market/kline", "get", parameters);
+            const json = response.data;
+
             if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
             }
-            
+
             return json;
         } catch (error) {
             throw new Error(`${error.message}`);
         }
     }
 
-    async orderHistory(symbol = null, orderStatus = null, size = 10, startTime = null, endTime = null){
+    async orderHistory(symbol = null, orderStatus = null, size = 10, startTime = null, endTime = null) {
         const funcName = "[orderHistory]:";
 
-        if(!symbol) throw new Error(`${funcName} symbol is blank`);
-        if(!orderStatus) throw new Error(`${funcName} orderStatus is blank`);
-        if(!startTime && !endTime && !size) throw new Error(`${funcName} either timestamp or size must be specified`);
-    
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!orderStatus) throw new Error(`${funcName} orderStatus is blank`);
+        if (!startTime && !endTime && !size) throw new Error(`${funcName} either timestamp or size must be specified`);
+
         symbol = symbol.toUpperCase();
         orderStatus = orderStatus.toUpperCase();
 
@@ -496,31 +450,30 @@ class Bitmusa {
             startTime: startTime,
             endTime: endTime,
             status: orderStatus,
-            size: size, 
+            size: size,
         }
 
-        try{
+        try {
             const response = await this.requestAPI("/api/v1/spot/order/history", "get", parameters);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data.data;
-    
+            const json = response.data;
+
             if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
             }
-            
+
             return json;
-        }catch(error){
+        } catch (error) {
             throw new Error(`${error.message}`);
         }
 
     }
 
-    async tradeHistory(symbol = null, startTime = null, endTime = null, direction = "BUY", size = 10){
+    async tradeHistory(symbol = null, startTime = null, endTime = null, direction = "BUY", size = 10) {
         const funcName = "[tradeHistory]:";
 
-        if(!symbol) throw new Error(`${funcName} symbol is blank`);
-        if(!startTime && !endTime && !size) throw new Error(`${funcName} either timestamp or size must be specified`);
-        if(!direction || direction.toUpperCase() !== "BUY" && direction.toUpperCase() !== "SELL") throw new Error(`${funcName} direction must be either BUY or SELL`);
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!startTime && !endTime && !size) throw new Error(`${funcName} either timestamp or size must be specified`);
+        if (!direction || direction.toUpperCase() !== "BUY" && direction.toUpperCase() !== "SELL") throw new Error(`${funcName} direction must be either BUY or SELL`);
 
         symbol = symbol.toUpperCase();
         direction = direction.toUpperCase();
@@ -533,31 +486,30 @@ class Bitmusa {
             size: size,
         }
 
-        try{
+        try {
             const response = await this.requestAPI("/api/v1/spot/trade/history", "get", parameters);
-            if (response.status !== 200) throw new Error(`${funcName} ${response.status}`);
-            const json = response.data.data;
-    
+            const json = response.data;
+
             if (json.code && json.code !== 0) {
                 throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
             }
-            
+
             return json;
-        }catch(error){
+        } catch (error) {
             logger.error(error)
         }
     }
 
     async futuresOrder(symbol = null, side = null, quantity = null, price = null,
-        params = { 
-        marginMode: "ISOLATED", 
-        closePosition: false, 
-        reduceOnly: false, 
-        postOnly: false,
-        takeProfit: {},
-        stopLoss: {},
-        }){
-            
+        params = {
+            marginMode: "ISOLATED",
+            closePosition: false,
+            reduceOnly: false,
+            postOnly: false,
+            takeProfit: {},
+            stopLoss: {},
+        }) {
+
         const funcName = "[futuresOrder]:";
 
         if (!symbol) throw new Error(`${funcName} symbol is blank`);
@@ -606,17 +558,17 @@ class Bitmusa {
             if (!orderParams || Object.keys(orderParams).length === 0) {
                 return {};
             }
-        
+
             const triggerTypeMap = { "MARK": 1, "LAST": 2 };
             const orderTypeMap = { "MARKET": 0, "LIMIT": 1 };
-        
+
             const triggerType = triggerTypeMap[orderParams.triggerType.toUpperCase()];
             const orderTypeNum = orderTypeMap[orderParams.orderType.toUpperCase()];
-        
+
             if (orderTypeNum === 1 && !orderParams.orderPrice) {
                 throw new Error(`[futuresOrder] ${orderType} order price must be specified for limit ${orderType} order`);
             }
-        
+
             return {
                 [`is_${orderType}`]: true,
                 [`${orderType}_trigger_type`]: triggerType,
@@ -643,13 +595,12 @@ class Bitmusa {
             ...stopLossOptions
 
         };
-        
+
         try {
-            const response = await this.requestFuturesAPI("/api/v2/future/order", "post", options);
+            const response = await this.requestAPI("/api/v2/future/order", "post", options);
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -734,11 +685,10 @@ class Bitmusa {
         if (!order_id) throw new Error(`${funcName} order_id is blank`);
 
         try {
-            const response = await this.requestFuturesAPI(`/api/v2/future/order/cancel/${order_id}`, "post");
+            const response = await this.requestAPI(`/api/v2/future/order/cancel/${order_id}`, "post");
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -755,11 +705,10 @@ class Bitmusa {
         symbol = symbol.toUpperCase();
 
         try {
-            const response = await this.requestFuturesAPI(`/api/v2/future/order/cancel/all?ticker=${symbol}`, "post");
+            const response = await this.requestAPI(`/api/v2/future/order/cancel/all?ticker=${symbol}`, "post");
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -776,11 +725,10 @@ class Bitmusa {
         symbol = symbol.toUpperCase();
 
         try {
-            const response = await this.requestFuturesAPI(`/api/v2/future/position/close/all?ticker=${symbol}`, "post");
+            const response = await this.requestAPI(`/api/v2/future/position/close/all?ticker=${symbol}`, "post");
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -802,11 +750,10 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v2/future/market/trade", "get", parameters);
+            const response = await this.requestAPI("/api/v2/future/market/trade", "get", parameters);
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -830,11 +777,10 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v2/future/leverage", "post", options);
+            const response = await this.requestAPI("/api/v2/future/leverage", "post", options);
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -856,11 +802,10 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v2/future/market/orderbook", "get", parameters);
+            const response = await this.requestAPI("/api/v2/future/market/orderbook", "get", parameters);
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -885,11 +830,10 @@ class Bitmusa {
         if (start_time) options = { ...options, start_time: start_time };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v2/future/order", "get", options);
+            const response = await this.requestAPI("/api/v2/future/order", "get", options);
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -910,11 +854,10 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v2/future/position", "get", options);
+            const response = await this.requestAPI("/api/v2/future/position", "get", options);
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -928,11 +871,10 @@ class Bitmusa {
         const funcName = "[futuresBalance]:";
 
         try {
-            const response = await this.requestFuturesAPI("/api/v2/future/wallet", "get", {});
+            const response = await this.requestAPI("/api/v2/future/wallet", "get", {});
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -957,11 +899,10 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v2/future/market", "get", options);
+            const response = await this.requestAPI("/api/v2/future/market", "get", options);
             const json = response.data;
 
             if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
 
@@ -973,9 +914,7 @@ class Bitmusa {
 
     async futuresPrices(symbol = null) {
         const funcName = "[futuresPrices]:";
-
         if (!symbol) throw new Error(`${funcName} symbol is blank`);
-
         symbol = symbol.toUpperCase();
 
         var options = {
@@ -983,19 +922,84 @@ class Bitmusa {
         };
 
         try {
-            const response = await this.requestFuturesAPI("/api/v2/future/market", "get", options);
+            const response = await this.requestAPI("/api/v2/future/market", "get", options);
             const json = response.data;
-
-            if (json.data.ticker === symbol) {
-                return json.data.last_price;
-            } else if (json.code !== 0) {
-                if (!json.message) throw new Error(`${funcName} ${response.status} ${response.statusText}`);
+            if (json.code !== 0) {
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
+            } else if (json.data.ticker === symbol) {
+                return json.data.last_price;
             }
-
             throw new Error(`${funcName} ${symbol} is not found`);
         } catch (error) {
-            throw new Error(`${funcName} An error occurred while fetching the future price:`, error.message);
+            throw new Error(`${funcName} An error occurred while fetching the future price: ${error}`);
+        }
+    }
+
+    async futuresKlines(symbol = 'BTCUSDT', interval = '1min', startTime = null, endTime = null, size = 100) {
+        const funcName = "[futuresKlines]:";
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        if (!interval) throw new Error(`${funcName} interval is blank`);
+        symbol = symbol.toUpperCase();
+        var options = {
+            ticker: symbol,
+            interval: interval,
+            startTime: startTime,
+            endTime: endTime,
+            size: size
+        }
+        try {
+            const response = await this.requestAPI("/api/v2/future/market/kline", "get", options);
+            const json = response.data;
+            if (json.code !== 0) {
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
+            }
+            return json;
+        } catch (error) {
+            throw new Error(`${funcName} An error occurred while fetching the future klines: ${error}`);
+        }
+    }
+
+    async futuresTradeHistory(symbol = 'BTCUSDT', position = null, direction = null, orderType = null, startTime = null, endTime = null, page = 1, size = null) {
+        const funcName = "[futuresTradeHistory]";
+        if (!symbol) throw new Error(`${funcName} symbol is blank`);
+        symbol = symbol.toUpperCase();
+
+        if (position) {
+            position = position.toUpperCase();
+            if (!['BUY', 'SELL'].includes(position)) throw new Error(`${funcName} position must be either 'BUY' or 'SELL'`);
+        }
+
+        if (direction) {
+            direction = direction.toUpperCase();
+            if (!['OPEN, CLOSE'].includes(direction)) throw new Error(`${funcName} direction must be either 'OPEN' or 'CLOSE'`);
+        }
+
+        if (orderType) {
+            orderType = orderType.toUpperCase();
+            if (!['MARKET', 'LIMIT', 'TAKE_PROFIT', 'STOP_LOSS', 'LIQUIDATION'].includes(orderType)) throw new Error(`${funcName} invalid orderType`);
+        }
+
+        if (!startTime && !endTime && !size) throw new Error(`${funcName} either timestamps or size must be speicifed`);
+
+        var options = {
+            ticker: symbol,
+            position: position,
+            direction: direction,
+            order_type: orderType,
+            startTime: startTime,
+            endTime: endTime,
+            page: page,
+            size: size
+        }
+        try {
+            const response = await this.requestAPI("/api/v2/future/trade/history", "get", options);
+            const json = response.data;
+            if (json.code !== 0) {
+                throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
+            }
+            return json.content
+        } catch (error) {
+            throw new Error(error.message);
         }
     }
 }
