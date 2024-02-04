@@ -14,8 +14,12 @@ Installation: npm install node-bitmusa-api
 const options = {
     xApiKey: "YOUR_API_KEY",
     authKey: "YOUR_AUTHORIZATION_KEY",
-    baseURL: "https://openapi.bitmusa.com",
+    useTestnet: true,
+    baseUrl: "TESTNET_URL",
+    streamUrl: "TESTNET_URL"
     timeout: 5000,
+    reconnect: true,
+    keepAlive: true,
 };
 
 const bitmusa = new Bitmusa(options);

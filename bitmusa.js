@@ -4,33 +4,43 @@
  * ============================================================
  * Copyright 2023 bitninja
  * Released under the MIT License
-* ============================================================ */
+ * ============================================================ */
 
 const axios = require("axios");
+const Websocket = require("ws");
 
 class Bitmusa {
     constructor(options = {}) {
-        this.baseUrl = "https://openapi.bitmusa.com"
-        this.options = this.getDefaultOptions();
+        // API base URLs
+        this.baseUrl = "https://openapi.bitmusa.com";
+        this.streamUrl = "";
 
+        // Default options
+        this.options = this.getDefaultOptions();
+        this.subscriptions = {};
+        this.callbacks = {};
+
+        // Validate and initialize options
         if (typeof options !== "object") {
             throw new Error("options must be an object");
         } else if (typeof options === "object") {
-
-            if (typeof options.timeout !== 'undefined') this.options.timeout = options.timeout;
-            if (typeof options.xApiKey !== 'undefined' && typeof options.authKey !== 'undefined') {
+            if (typeof options.reconnect !== "undefined") this.options.reconnect = options.reconnect;
+            if (typeof options.keepAlive !== "undefined") this.options.keepAlive = options.keepAlive;
+            if (typeof options.timeout !== "undefined") this.options.timeout = options.timeout;
+            if (typeof options.xApiKey !== "undefined" && typeof options.authKey !== "undefined") {
                 this.options.xApiKey = options.xApiKey;
                 this.options.authKey = options.authKey;
             } else {
-                throw new Error('xApiKey and authKey must be specified upon creating bitmusa instance')
+                throw new Error("xApiKey and authKey must be specified upon creating bitmusa instance");
             }
 
             if (options.useTestnet === true) {
                 this.options.useTestnet = true;
-                if (typeof options.baseUrl !== 'undefined') {
+                if (typeof options.baseUrl !== "undefined" && typeof options.streamUrl !== "undefined") {
                     this.baseUrl = options.baseUrl;
+                    this.streamUrl = options.streamUrl;
                 } else {
-                    throw new Error("baseUrl is required when useTestnet is set to true");
+                    throw new Error("baseUrl and streamUrl must be specified when useTestnet is set to true");
                 }
             }
         }
@@ -42,6 +52,8 @@ class Bitmusa {
             authKey: null,
             timeout: 1000,
             useTestnet: false,
+            reconnect: true,
+            keepAlive: true,
         };
     }
 
@@ -75,9 +87,294 @@ class Bitmusa {
                 const errorMessage = errorData.message || error.message;
                 return { data: { code: errorCode, message: errorMessage, debug: 1 } };
             } else {
-                throw new Error(`Failed to requestAPI ${path}: ${error.message}`)
+                throw new Error(`Failed to requestAPI ${path}: ${error.message}`);
             }
         }
+    }
+
+    /**
+     * Subscribes to a specific channel.
+     * @param {string} channel - The channel to subscribe to
+     * @param {function} callback - Callback function to handle incoming messages.
+     *                              This function should accept two parameters:
+     *                                1. channel (string): The channel from which the message is received.
+     *                                2. data (object/string): The data received from the socket.
+     *                                Example: (channel, data) => { ... }
+     * @param {boolean} isPrivate - Indicates if the subscription is private (requires authentication)
+     */
+    async subscribe(channel, callback) {
+        if (this.subscriptions[channel]) {
+            console.log(`Already subscribed to channel: ${channel}`);
+        } else {
+            await this._openSocket(channel, callback);
+        }
+    }
+
+    /**
+     * Opens a WebSocket connection to a specific channel.
+     * @param {string} channel - The channel to connect to
+     * @param {function} callback - Callback function to handle incoming messages.
+     *                              This function should accept two parameters:
+     *                                1. channel (string): The channel from which the message is received.
+     *                                2. data (object/string): The data received from the socket.
+     *                                Example: (channel, data) => { ... }
+     * @param {boolean} isPrivate - Indicates if the connection is private (requires authentication)
+     */
+    async _openSocket(channel, callback,) {
+        let url = `${this.streamUrl}${channel}`;
+        console.log(channel)
+        const ws = new Websocket(url);
+        ws.on("open", this._handleSocketOpen.bind(this, channel));
+        ws.on("close", this._handleSocketClose.bind(this, channel));
+        ws.on("error", this._handleSocketError.bind(this, channel));
+        ws.on("message", (data) => this._handleSocketMessage(channel, callback, data));
+        ws.on("ping", this._handleSocketPing.bind(this, ws));
+
+        this.subscriptions[channel] = ws;
+        this.callbacks[channel] = callback;
+
+        if (!this.vitalCheckStarted) {
+            this._startVitalCheck();
+            this.vitalCheckStarted = true;
+        }
+    }
+
+    _handleSocketPing(ws) {
+        ws.pong();
+    }
+
+    _handleSocketOpen(channel) {
+        console.log(`Subscribed to channel: ${channel}`);
+        this.subscriptions[channel].alive = true;
+    }
+
+    // Handle WebSocket close
+    _handleSocketClose(channel) {
+        console.log(`Disconnected for channel: ${channel}`);
+        if (this.options.reconnect) {
+            console.log(`Reconnecting to channel: ${channel}`);
+            this._openSocket(channel, this.callbacks[channel]);
+        }
+    }
+
+    _handleSocketMessage(channel, callback, data) {
+        try {
+            const parsedData = JSON.parse(data);
+            callback(channel, parsedData);
+        } catch (error) {
+            console.error(`Error parsing message from channel ${channel}:`, error);
+        }
+    }
+
+    _handleSocketError(channel, error) {
+        console.error(`WebSocket error on channel ${channel}:`, error);
+        if (this.options.reconnect) {
+            console.log(`Attempting to reconnect to channel: ${channel}`);
+            this._openSocket(channel, this.callbacks[channel]);
+        }
+    }
+
+    _terminate(channel) {
+        let ws = this.subscriptions[channel];
+        ws.terminate();
+    }
+
+    _startVitalCheck(interval = 30 * 1000) {
+        // Default to 30 seconds
+        setInterval(() => {
+            for (let channel in this.subscriptions) {
+                const ws = this.subscriptions[channel];
+                if (ws && ws.readyState === Websocket.OPEN) {            
+                    if (!ws.alive) {
+                        console.log(`Disconnected Channel: ${channel}`);
+                        if (this.options.reconnect) {
+                            console.log("trying reconnect...");
+                            const callback = this.callbacks[channel];
+                            console.log(callback);
+                            this._openSocket(channel, callback);
+                        }
+                    }
+                }
+            }
+        }, interval);
+    }
+
+    async getListenKey() {
+        const funcName = "[getListenKey]";
+        try {
+            const response = await this.requestAPI("/api/v1/spot/userDataStream", "post");
+            const json = response.data;
+
+            if (json.code !== 0) {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+
+            return json.data.listenKey;
+        } catch (error) {
+            throw new Error(error.message);
+        }
+    }
+
+    async updateListenKey() {
+        const funcName = "[updateListenKey]";
+        try {
+            const response = await this.requestAPI("/api/v1/spot/userDataStream", "put");
+            const json = response.data;
+
+            if (json.code !== 0) {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+        } catch (error) {
+            throw new Error(error.message);
+        }
+    }
+
+    async deleteListenKey() {
+        const funcName = "[deleteListenKey]";
+        try {
+            const response = await this.requestAPI("/api/v1/spot/userDataStream", "delete");
+            const json = response.data;
+            if (json.code !== 0) {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+        } catch (error) {
+            throw new Error(error.message);
+        }
+    }
+
+    async getFuturesListenKey() {
+        const funcName = "[getFuturesListenKey]";
+        try {
+            const response = await this.requestAPI("/api/v2/future/userDataStream", "post");
+            const json = response.data;
+
+            if (json.code !== 0) {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+            return json.data.listenKey;
+        } catch (error) {
+            throw new Error(error.message);
+        }
+    }
+
+    async updateFuturesListenKey() {
+        const funcName = "[updateFuturesListenKey]";
+        try {
+            const response = await this.requestAPI("/api/v1/future/userDataStream", "put");
+            const json = response.data;
+            if (json.code !== 0) {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+        } catch (error) {
+            throw new Error(error.message);
+        }
+    }
+
+    async deleteFuturesListenKey() {
+        const funcName = "[deleteFuturesListenKey]";
+        try {
+            const response = await this.requestAPI("/api/v1/future/userDataStream", "delete");
+            const json = response.data;
+            if (json.code !== 0) {
+                throw new Error(`${funcName} ${response.data.message}[code:${json.code}]`);
+            }
+        } catch (error) {
+            throw new Error(error.message);
+        }
+    }
+
+    _userStreamKeepAlive(interval = 59 * 60 * 1000) {
+        //updates listenKey every 59 minutes
+        setInverval(async () => {
+            await this.updateListenKey();
+        }, interval);
+    }
+
+    _futuresUserStreamKeepAlive(interval = 59 * 60 * 1000) {
+        //updates listenKey every 59 minutes
+        setInterval(async () => {
+            await this.updateFuturesListenKey();
+        }, interval);
+    }
+
+    /**
+     * Initiates a subscription to an order book stream for a specified trading symbol.
+     * @param {string} symbol - The trading symbol to subscribe to, e.g., 'BTCUSDT'. Default: 'BTCUSDT'.
+     * @param {string} level - The depth of the order book to subscribe to. Accepted values: '5', '10', '20'. Default: '5'.
+     * @param {string} frequency - The frequency at which the stream is updated. Accepted values: '1s', '100ms'. Default: '100ms'.
+     * @param {function} callback - The callback function to handle incoming messages. If not provided, defaults to logging to the console.
+     */
+    orderBookStream(symbol = "BTCUSDT", level = "5", frequency = "100ms", callback = console.log) {
+        const channel = `/ws/spot/public?stream=${symbol}@depth${level}@${frequency}`;
+        this.subscribe(channel, callback);
+    }
+
+    /**
+     * Initiates a subscription to a kline (candlestick chart data) stream for a specified trading symbol.
+     *
+     * @param {string} symbol - The trading symbol to subscribe to, e.g., 'BTCUSDT'. Default: 'BTCUSDT'.
+     * @param {string} interval - The time interval for the kline/candlestick data. Accepted values: '1min', '3min', '5min', '15min', '30min', '1H', '2H', '4H', '6H', '8H', '12H', '1D', '1W', '1M'. Default: '1min'.
+     * @param {function} callback - The callback function to handle incoming messages. If not provided, defaults to logging to the console.
+     */
+    klineStream(symbol = "BTCUSDT", interval = "1min", callback = console.log) {
+        const channel = `/ws/spot/public?stream=${symbol.toLowerCase()}@kline_${interval}`;
+        this.subscribe(channel, callback);
+    }
+
+    /**
+     * Initiates a subscription to a futures order book stream for a specified trading symbol.
+     *
+     * @param {string} symbol - The trading symbol to subscribe to, e.g., 'BTCUSDT'. Default: 'BTCUSDT'.
+     * @param {string} level - The depth of the order book to subscribe to. Accepted values: '5', '10', '20'. Default: '5'.
+     * @param {string} frequency - The frequency at which the stream is updated. Accepted values: '1s', '100ms'. Default: '100ms'.
+     * @param {function} callback - The callback function to handle incoming messages. If not provided, defaults to logging to the console.
+     */
+    futuresOrderBookStream(symbol = "BTCUSDT", level = "5", frequency = "100ms", callback = console.log) {
+        const channel = `/ws/future/public?stream=${symbol}@depth${level}@${frequency}`;
+        this.subscribe(channel, callback);
+    }
+
+    /**
+     * Initiates a subscription to a kline (candlestick chart data) stream for a specified trading symbol.
+     *
+     * @param {string} symbol - The trading symbol to subscribe to, e.g., 'BTCUSDT'. Default: 'BTCUSDT'.
+     * @param {string} interval - The time interval for the kline/candlestick data. Accepted values: '1min', '3min', '5min', '15min', '30min', '1H', '2H', '4H', '6H', '8H', '12H', '1D', '1W', '1M'. Default: '1min'.
+     * @param {function} callback - The callback function to handle incoming messages. If not provided, defaults to logging to the console.
+     */
+    futuresKlineStream(symbol = "BTCUSDT", interval = "1min", callback = console.log) {
+        const channel = `/ws/future/public?stream=${symbol}@kline_${interval}`;
+        this.subscribe(channel, callback);
+    }
+
+    async userDataStream(callback = console.log) {
+        const funcName = "[userDataStream]";
+        try {
+            this.options.spotListenKey = await this.getListenKey();
+        } catch (error) {
+            throw new Error(`${funcName} ${error.message}`)
+        }
+
+        if (this.keepAlive === true) {
+            this._userStreamKeepAlive();
+        }
+
+        const channel = `/ws/spot/wallet/${this.options.spotListenKey}`;
+        this.subscribe(channel, callback);
+    }
+
+    async futuresUserDataStream(callback = console.log) {
+        const funcName = "[futuresUserDataStream]";
+        try {
+            this.options.futuresListenKey = await this.getFuturesListenKey();
+        } catch (error) {
+            throw new Error(`${funcName} ${error.message}`)
+        }
+        if (this.keepAlive === true) {
+            this._futuresUserStreamKeepAlive();
+        }
+
+        const channel = `/ws/future/wallet/${this.options.futuresListenKey}`;
+        this.subscribe(channel, callback);
     }
 
     async order(symbol = null, direction = null, quantity = null, price = null, params = {}) {
@@ -411,15 +708,14 @@ class Bitmusa {
         if (!interval) throw new Error(`${funcName} interval is blank`);
         if (!startTime && !endTime && !size) throw new Error(`${funcName} either timestamps or size must specified`);
 
-
         symbol = symbol.toUpperCase();
 
         var parameters = {
             symbol: symbol,
             from: startTime,
             to: endTime,
-            resolution: interval
-        }
+            resolution: interval,
+        };
 
         try {
             const response = await this.requestAPI("/api/v1/spot/market/kline", "get", parameters);
@@ -451,7 +747,7 @@ class Bitmusa {
             endTime: endTime,
             status: orderStatus,
             size: size,
-        }
+        };
 
         try {
             const response = await this.requestAPI("/api/v1/spot/order/history", "get", parameters);
@@ -465,7 +761,6 @@ class Bitmusa {
         } catch (error) {
             throw new Error(`${error.message}`);
         }
-
     }
 
     async tradeHistory(symbol = null, startTime = null, endTime = null, direction = "BUY", size = 10) {
@@ -473,7 +768,7 @@ class Bitmusa {
 
         if (!symbol) throw new Error(`${funcName} symbol is blank`);
         if (!startTime && !endTime && !size) throw new Error(`${funcName} either timestamp or size must be specified`);
-        if (!direction || direction.toUpperCase() !== "BUY" && direction.toUpperCase() !== "SELL") throw new Error(`${funcName} direction must be either BUY or SELL`);
+        if (!direction || (direction.toUpperCase() !== "BUY" && direction.toUpperCase() !== "SELL")) throw new Error(`${funcName} direction must be either BUY or SELL`);
 
         symbol = symbol.toUpperCase();
         direction = direction.toUpperCase();
@@ -484,7 +779,7 @@ class Bitmusa {
             endTime: endTime,
             direction: direction,
             size: size,
-        }
+        };
 
         try {
             const response = await this.requestAPI("/api/v1/spot/trade/history", "get", parameters);
@@ -496,11 +791,15 @@ class Bitmusa {
 
             return json;
         } catch (error) {
-            logger.error(error)
+            logger.error(error);
         }
     }
 
-    async futuresOrder(symbol = null, side = null, quantity = null, price = null,
+    async futuresOrder(
+        symbol = null,
+        side = null,
+        quantity = null,
+        price = null,
         params = {
             marginMode: "ISOLATED",
             closePosition: false,
@@ -508,8 +807,8 @@ class Bitmusa {
             postOnly: false,
             takeProfit: {},
             stopLoss: {},
-        }) {
-
+        }
+    ) {
         const funcName = "[futuresOrder]:";
 
         if (!symbol) throw new Error(`${funcName} symbol is blank`);
@@ -559,8 +858,8 @@ class Bitmusa {
                 return {};
             }
 
-            const triggerTypeMap = { "MARK": 1, "LAST": 2 };
-            const orderTypeMap = { "MARKET": 0, "LIMIT": 1 };
+            const triggerTypeMap = { MARK: 1, LAST: 2 };
+            const orderTypeMap = { MARKET: 0, LIMIT: 1 };
 
             const triggerType = triggerTypeMap[orderParams.triggerType.toUpperCase()];
             const orderTypeNum = orderTypeMap[orderParams.orderType.toUpperCase()];
@@ -592,8 +891,7 @@ class Bitmusa {
             is_reduce_only: params.reduceOnly,
             is_post_only: params.postOnly,
             ...takeProfitOptions,
-            ...stopLossOptions
-
+            ...stopLossOptions,
         };
 
         try {
@@ -931,11 +1229,11 @@ class Bitmusa {
             }
             throw new Error(`${funcName} ${symbol} is not found`);
         } catch (error) {
-            throw new Error(`${funcName} An error occurred while fetching the future price: ${error}`);
+            throw new Error(error.message);
         }
     }
 
-    async futuresKlines(symbol = 'BTCUSDT', interval = '1min', startTime = null, endTime = null, size = 100) {
+    async futuresKlines(symbol = "BTCUSDT", interval = "1min", startTime = null, endTime = null, size = 100) {
         const funcName = "[futuresKlines]:";
         if (!symbol) throw new Error(`${funcName} symbol is blank`);
         if (!interval) throw new Error(`${funcName} interval is blank`);
@@ -945,8 +1243,8 @@ class Bitmusa {
             interval: interval,
             startTime: startTime,
             endTime: endTime,
-            size: size
-        }
+            size: size,
+        };
         try {
             const response = await this.requestAPI("/api/v2/future/market/kline", "get", options);
             const json = response.data;
@@ -955,28 +1253,28 @@ class Bitmusa {
             }
             return json;
         } catch (error) {
-            throw new Error(`${funcName} An error occurred while fetching the future klines: ${error}`);
+            throw new Error(error.message);
         }
     }
 
-    async futuresTradeHistory(symbol = 'BTCUSDT', position = null, direction = null, orderType = null, startTime = null, endTime = null, page = 1, size = null) {
+    async futuresTradeHistory(symbol = "BTCUSDT", position = null, direction = null, orderType = null, startTime = null, endTime = null, page = 1, size = null) {
         const funcName = "[futuresTradeHistory]";
         if (!symbol) throw new Error(`${funcName} symbol is blank`);
         symbol = symbol.toUpperCase();
 
         if (position) {
             position = position.toUpperCase();
-            if (!['BUY', 'SELL'].includes(position)) throw new Error(`${funcName} position must be either 'BUY' or 'SELL'`);
+            if (!["BUY", "SELL"].includes(position)) throw new Error(`${funcName} position must be either 'BUY' or 'SELL'`);
         }
 
         if (direction) {
             direction = direction.toUpperCase();
-            if (!['OPEN, CLOSE'].includes(direction)) throw new Error(`${funcName} direction must be either 'OPEN' or 'CLOSE'`);
+            if (!["OPEN, CLOSE"].includes(direction)) throw new Error(`${funcName} direction must be either 'OPEN' or 'CLOSE'`);
         }
 
         if (orderType) {
             orderType = orderType.toUpperCase();
-            if (!['MARKET', 'LIMIT', 'TAKE_PROFIT', 'STOP_LOSS', 'LIQUIDATION'].includes(orderType)) throw new Error(`${funcName} invalid orderType`);
+            if (!["MARKET", "LIMIT", "TAKE_PROFIT", "STOP_LOSS", "LIQUIDATION"].includes(orderType)) throw new Error(`${funcName} invalid orderType`);
         }
 
         if (!startTime && !endTime && !size) throw new Error(`${funcName} either timestamps or size must be speicifed`);
@@ -989,15 +1287,15 @@ class Bitmusa {
             startTime: startTime,
             endTime: endTime,
             page: page,
-            size: size
-        }
+            size: size,
+        };
         try {
             const response = await this.requestAPI("/api/v2/future/trade/history", "get", options);
             const json = response.data;
             if (json.code !== 0) {
                 throw new Error(`${funcName} ${json.message}[code:${json.code}]`);
             }
-            return json.content
+            return json.content;
         } catch (error) {
             throw new Error(error.message);
         }
