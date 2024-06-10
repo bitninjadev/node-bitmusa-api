@@ -1,7 +1,7 @@
 # node-bitmusa-api
 The node-bitmusa-api is a node.js module developed to interact with the Bitmusa API. Created to assist you in crafting your own projects that merge with Bitmusa - a platform launched in 2022 - this project's main objective is to provide comprehensive coverage of the API.
 
-
+# TEST
 ### quick start
 
 ```bash
