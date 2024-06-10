@@ -23,6 +23,7 @@ const bitmusa = new Bitmusa(options);
 
 /*
 
+
 { code: 0, message: 'success' }
 
 */
